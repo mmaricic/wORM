@@ -81,6 +81,15 @@ public class LazyList<T> implements List<T> {
         return this;
     }
 
+    public T first() {
+        limit = 1;
+        init();
+        if (delegate.size() == 0) {
+            return null;
+        }
+        return delegate.get(0);
+    }
+
     private void init() {
         if (delegate != null)
             return;

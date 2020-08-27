@@ -195,6 +195,55 @@ class EntityManagerTest {
     }
 
     @Test
+    void findFirst() throws Exception {
+        EntityManager em = EntityManagerFactory.getEntityManager();
+        Calendar calendar = Calendar.getInstance();
+
+        Company company = new Company();
+        company.setId(2);
+        company.setName("Company");
+        calendar.set(2016, Calendar.JULY, 10);
+        company.setFoundingDate(formatter.parse(formatter.format(calendar.getTime())));
+        Company.Address address = new Company.Address();
+        address.setCountry("Serbia");
+        address.setCity("Belgrade");
+        address.setHouseNumber(0);
+        company.setAddress(address);
+
+
+        Company company2 = new Company();
+        company2.setId(3);
+        company2.setName("Company 2");
+        calendar.set(2014, Calendar.APRIL, 17);
+        company2.setFoundingDate(formatter.parse(formatter.format(calendar.getTime())));
+        address = new Company.Address();
+        address.setCountry("Serbia");
+        address.setCity("Nis");
+        company2.setAddress(address);
+
+        Company notReturnedConditions = new Company();
+        notReturnedConditions.setId(4);
+        notReturnedConditions.setName("Ignored Company");
+        calendar.set(2020, Calendar.JUNE, 11);
+        notReturnedConditions.setFoundingDate(formatter.parse(formatter.format(calendar.getTime())));
+        address = new Company.Address();
+        address.setCountry("Italy");
+        address.setCity("Milano");
+        notReturnedConditions.setAddress(address);
+
+        em.save(company);
+        em.save(company2);
+        em.save(notReturnedConditions);
+
+        Company result = em.find(Company.class)
+                .where("country='Serbia'")
+                .orderBy("id desc")
+                .first();
+
+        compareCompanies(company2, result);
+    }
+
+    @Test
     void query() throws Exception {
         Calendar calendar = Calendar.getInstance();
 
