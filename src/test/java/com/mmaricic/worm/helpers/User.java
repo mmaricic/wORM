@@ -1,25 +1,23 @@
 package com.mmaricic.worm.helpers;
 
 import javax.persistence.*;
-import java.util.Calendar;
-import java.util.Date;
 
 @Entity
 public class User {
     public static int stat = 2;
-    private Integer id;
+    private Long id;
     private String address;
-    private Date dateOfBirth;
     private String email;
     private String password;
     private Name name;
 
     @Id
-    public Integer getId() {
+    @GeneratedValue
+    public Long getId() {
         return id;
     }
 
-    public void setId(Integer id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -58,17 +56,9 @@ public class User {
         this.name = name;
     }
 
-    public void setDateOfBirth(Date dateOfBirth) {
-        this.dateOfBirth = dateOfBirth;
-    }
 
     // This will be put in database
     public int getAge() {
-        if (dateOfBirth != null) {
-            Calendar userAge = Calendar.getInstance();
-            userAge.setTime(dateOfBirth);
-            return Calendar.getInstance().get(Calendar.YEAR) - userAge.get(Calendar.YEAR);
-        }
         return 0;
     }
 

@@ -2,8 +2,8 @@ package com.mmaricic.worm;
 
 import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import com.mmaricic.worm.exceptions.AnnotationException;
 import com.mmaricic.worm.exceptions.EntityIdException;
-import com.mmaricic.worm.exceptions.NotEntityException;
 import com.mmaricic.worm.helpers.Company;
 import com.mmaricic.worm.helpers.User;
 import org.junit.jupiter.api.Test;
@@ -59,7 +59,7 @@ class EntityParserTest {
         EntityParser ep = new EntityParser();
         TestEntity testEntity = new TestEntity();
 
-        assertThrows(NotEntityException.class, () -> ep.extactTableName(testEntity.getClass()));
+        assertThrows(AnnotationException.class, () -> ep.extactTableName(testEntity.getClass()));
     }
 
     @Test
@@ -95,22 +95,19 @@ class EntityParserTest {
     @Test
     void parseFromFields() {
         User user = new User();
-        user.setId(2);
+        user.setId(2L);
         user.setAddress("dummy");
         user.setEmail("john@mail.com");
         user.setPassword("pass123");
         user.setName(new User.Name("john", "doe"));
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(1996, Calendar.MARCH, 19);
-        user.setDateOfBirth(calendar.getTime());
 
         HashMap<String, Object> expected = new HashMap<>();
-        expected.put("id", 2);
+        expected.put("id", 2L);
         expected.put("home_address", "dummy");
         expected.put("email", "john@mail.com");
         expected.put("firstname", "john");
         expected.put("lastname", "doe");
-        expected.put("age", 24);
+        expected.put("age", 0);
 
         EntityParser ep = new EntityParser();
         Map<String, Object> actual = ep.parse(user, true);

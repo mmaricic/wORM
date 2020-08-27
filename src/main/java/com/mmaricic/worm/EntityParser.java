@@ -1,35 +1,31 @@
 package com.mmaricic.worm;
 
+import com.mmaricic.worm.exceptions.AnnotationException;
 import com.mmaricic.worm.exceptions.EntityIdException;
 import com.mmaricic.worm.exceptions.EntityIdException.EntityIdExceptionType;
 import com.mmaricic.worm.exceptions.EntityLoaderException;
-import com.mmaricic.worm.exceptions.NotEntityException;
 
 import javax.persistence.*;
 import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.AbstractMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.*;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class EntityParser {
-    //TODO: kako resiti id - baza generise, ti generises, user input, kako hendlovati sve ovo?
     public Map<String, Object> parse(Object entity, boolean includeId)
-            throws NotEntityException, EntityLoaderException {
+            throws AnnotationException, EntityLoaderException {
         if (entity == null) {
             return new LinkedHashMap<>();
         }
         Class<?> entityClass = entity.getClass();
         if (!entityClass.isAnnotationPresent(Entity.class)) {
-            throw new NotEntityException(entityClass.getSimpleName());
+            throw new AnnotationException(String.format(
+                    "Class %s is not marked as an entity! " +
+                            "If the class represent Table in database, please add @Entity annotation.",
+                    entityClass.getSimpleName()));
         }
 
 
@@ -39,9 +35,12 @@ public class EntityParser {
             return parseFromGetters(entity, includeId);
     }
 
-    public String extactTableName(Class<?> entityClass) throws NotEntityException {
+    public String extactTableName(Class<?> entityClass) throws AnnotationException {
         if (!entityClass.isAnnotationPresent(Entity.class)) {
-            throw new NotEntityException(entityClass.getSimpleName());
+            throw new AnnotationException(String.format(
+                    "Class %s is not marked as an entity! " +
+                            "If the class represent Table in database, please add @Entity annotation.",
+                    entityClass.getSimpleName()));
         }
         Table annot = entityClass.getAnnotation(Table.class);
         if (annot != null) {
@@ -51,7 +50,7 @@ public class EntityParser {
     }
 
     public AbstractMap.SimpleEntry<String, Object> extractId(Object entity)
-            throws EntityIdException, EntityLoaderException {
+            throws EntityIdException, EntityLoaderException { // Ovo da vraca mapu jer je mozda embeddedId
         Class<?> entityClass = entity.getClass();
 
         List<Field> idList = Stream.of(entityClass.getDeclaredFields())
@@ -73,10 +72,11 @@ public class EntityParser {
 
         PropertyDescriptor idDescriptor = getIdDescriptor(entityClass);
         try {
-            return new AbstractMap.SimpleEntry<>(getColumnNameFromDescriptor(idDescriptor), idDescriptor.getReadMethod().invoke(entity));
+            return new AbstractMap.SimpleEntry<>(
+                    getColumnNameFromDescriptor(idDescriptor), idDescriptor.getReadMethod().invoke(entity));
         } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new EntityLoaderException(
-                    String.format("An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
+            throw new EntityLoaderException(String.format(
+                    "An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
                             idDescriptor.getReadMethod().getName(), entityClass.getSimpleName(), e.getMessage()));
         }
     }
@@ -102,13 +102,19 @@ public class EntityParser {
         try {
             entity = entityClass.getDeclaredConstructor().newInstance();
         } catch (NoSuchMethodException e) {
-            throw new EntityLoaderException("Entity class " + entityClass.getSimpleName() + " does not have a default constructor.");
+            throw new EntityLoaderException(String.format(
+                    "Entity class %s does not have a default constructor.", entityClass.getSimpleName()));
         } catch (IllegalAccessException e) {
-            throw new EntityLoaderException("Constructor for entity class" + entityClass.getSimpleName() + " is not accessible. Please make it public");
+            throw new EntityLoaderException(String.format(
+                    "Constructor for entity class %s is not accessible. Please make it public",
+                    entityClass.getSimpleName()));
         } catch (InstantiationException e) {
-            throw new EntityLoaderException("Entity class" + entityClass.getSimpleName() + " is abstract!");
+            throw new EntityLoaderException(String.format(
+                    "Entity class %s is abstract!", entityClass.getSimpleName()));
         } catch (InvocationTargetException e) {
-            throw new EntityLoaderException("Default counstructor for entity class " + entityClass.getSimpleName() + "threw the following error: " + e.getMessage());
+            throw new EntityLoaderException(String.format(
+                    "Default counstructor for entity class %s threw the following error: %S",
+                    entityClass.getSimpleName(), e.getMessage()));
         }
 
         try {
@@ -132,7 +138,8 @@ public class EntityParser {
                     Method setMethod = propertyDescriptor.getWriteMethod();
                     if (getMethod != null && setMethod != null) {
                         if (getMethod.getAnnotation(Embedded.class) != null) {
-                            setMethod.invoke(entity, convertRowToEntity(getMethod.getReturnType(), entityElements, entityClass));
+                            setMethod.invoke(
+                                    entity, convertRowToEntity(getMethod.getReturnType(), entityElements, entityClass));
                             continue;
                         }
 
@@ -145,7 +152,7 @@ public class EntityParser {
                 }
             }
         } catch (IllegalAccessException | InvocationTargetException | IntrospectionException e) {
-            throw new EntityLoaderException("An error occured while trying to convert row: " + e.getMessage());
+            throw new EntityLoaderException("An error occurred while trying to convert row: " + e.getMessage());
         }
         return entity;
     }
@@ -170,6 +177,13 @@ public class EntityParser {
         for (Field field : entityClass.getDeclaredFields()) {
             if (!includeId && field.getAnnotation(Id.class) != null) {
                 continue;
+            }
+            if (field.getAnnotation(GeneratedValue.class) != null) {
+                if (field.getAnnotation(Id.class) == null) {
+                    throw new AnnotationException(String.format(
+                            "Bad annotation in class %s. @GeneratedValue can only be used with @Id annotation.",
+                            entityClass.getSimpleName()));
+                }
             }
 
             field.setAccessible(true);
@@ -239,14 +253,14 @@ public class EntityParser {
                     if (value != null)
                         result.put(getColumnNameFromDescriptor(propertyDescriptor), value);
                 } catch (IllegalAccessException | InvocationTargetException e) {
-                    throw new EntityLoaderException(
-                            String.format("An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
+                    throw new EntityLoaderException(String.format(
+                            "An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
                                     getMethod.getName(), entityClass.getSimpleName(), e.getMessage()));
                 }
             }
         } catch (IntrospectionException e) {
-            throw new EntityLoaderException(
-                    String.format("An error occurred while trying to parse entity class: %s, message: %s",
+            throw new EntityLoaderException(String.format(
+                    "An error occurred while trying to parse entity class: %s, message: %s",
                             entityClass.getSimpleName(), e.getMessage()));
         }
 
@@ -271,7 +285,8 @@ public class EntityParser {
             List<PropertyDescriptor> idDescriptorsList = Stream
                     .of(Introspector.getBeanInfo(entityClass, Object.class).getPropertyDescriptors())
                     .filter(descriptor ->
-                            descriptor.getReadMethod() != null && descriptor.getReadMethod().isAnnotationPresent(Id.class))
+                            descriptor.getReadMethod() != null
+                                    && descriptor.getReadMethod().isAnnotationPresent(Id.class))
                     .collect(Collectors.toList());
 
             if (idDescriptorsList.size() == 0) {
@@ -282,10 +297,32 @@ public class EntityParser {
             }
             return idDescriptorsList.get(0);
         } catch (IntrospectionException e) {
-            throw new EntityLoaderException(
-                    String.format("An error occurred while trying to find Id annotation for entity class: %s, message: %s",
+            throw new EntityLoaderException(String.format(
+                    "An error occurred while trying to find Id annotation for entity class: %s, message: %s",
                             entityClass.getSimpleName(), e.getMessage()));
         }
     }
 
+    public boolean idIsAutoGenerated(Class<?> entityClass) { // Ovde proveriti da li je EmbeddedId zajedno sa GeneratedValue
+        Optional<Field> idField = Stream.of(entityClass.getDeclaredFields())
+                .filter(field -> field.isAnnotationPresent(Id.class)).findAny();
+        if (idField.isPresent())
+            return idField.get().getAnnotation(GeneratedValue.class) != null;
+
+        try {
+            Optional<PropertyDescriptor> idDescriptor = Stream
+                    .of(Introspector.getBeanInfo(entityClass, Object.class).getPropertyDescriptors())
+                    .filter(descriptor ->
+                            descriptor.getReadMethod() != null
+                                    && descriptor.getReadMethod().isAnnotationPresent(Id.class))
+                    .findAny();
+            if (idDescriptor.isPresent())
+                return idDescriptor.get().getReadMethod().getAnnotation(GeneratedValue.class) != null;
+        } catch (IntrospectionException e) {
+            throw new EntityLoaderException(String.format(
+                    "Error checking if id field is autogenerated for class %s. Error: %s",
+                    entityClass.getSimpleName(), e.getMessage()));
+        }
+        return false;
+    }
 }
