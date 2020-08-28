@@ -46,7 +46,7 @@ public class EntityParser {
         if (annot != null) {
             return annot.name();
         }
-        return entityClass.getSimpleName();
+        return entityClass.getSimpleName().toLowerCase();
     }
 
     public AbstractMap.SimpleEntry<String, Object> extractId(Object entity)
@@ -77,7 +77,7 @@ public class EntityParser {
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new EntityLoaderException(String.format(
                     "An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
-                            idDescriptor.getReadMethod().getName(), entityClass.getSimpleName(), e.getMessage()));
+                    idDescriptor.getReadMethod().getName(), entityClass.getSimpleName(), e.getMessage()));
         }
     }
 
@@ -157,7 +157,7 @@ public class EntityParser {
         return entity;
     }
 
-    private boolean isIddAnnotationOnField(Class<?> entityClass) throws EntityIdException {
+    boolean isIddAnnotationOnField(Class<?> entityClass) throws EntityIdException {
         long fieldsWithId = Stream.of(entityClass.getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(Id.class)).count();
         if (fieldsWithId > 1) {
@@ -194,6 +194,10 @@ public class EntityParser {
             }
 
             if (field.getAnnotation(Transient.class) != null) {
+                continue;
+            }
+
+            if (isAssociation(field)) {
                 continue;
             }
             try {
@@ -241,6 +245,10 @@ public class EntityParser {
                     }
                 }
 
+                if (isAssociation(getMethod)) {
+                    continue;
+                }
+
                 if (getMethod.getAnnotation(Transient.class) != null) {
                     continue;
                 }
@@ -255,19 +263,27 @@ public class EntityParser {
                 } catch (IllegalAccessException | InvocationTargetException e) {
                     throw new EntityLoaderException(String.format(
                             "An error occurred while trying to invoke getter method %s in entity class: %s, message: %s",
-                                    getMethod.getName(), entityClass.getSimpleName(), e.getMessage()));
+                            getMethod.getName(), entityClass.getSimpleName(), e.getMessage()));
                 }
             }
         } catch (IntrospectionException e) {
             throw new EntityLoaderException(String.format(
                     "An error occurred while trying to parse entity class: %s, message: %s",
-                            entityClass.getSimpleName(), e.getMessage()));
+                    entityClass.getSimpleName(), e.getMessage()));
         }
 
         if (!foundId && !entityClass.isAnnotationPresent(Embeddable.class)) {
             throw new EntityIdException(entityClass.getSimpleName(), EntityIdExceptionType.NO_ID);
         }
         return result;
+    }
+
+    private boolean isAssociation(AnnotatedElement ae) {
+        return ae.getAnnotation(OneToMany.class) != null
+                || ae.getAnnotation(ManyToOne.class) != null
+                || ae.getAnnotation(ManyToMany.class) != null
+                || ae.getAnnotation(OneToOne.class) != null;
+
     }
 
     private String getColumnNameFromField(Field field) {
@@ -299,7 +315,7 @@ public class EntityParser {
         } catch (IntrospectionException e) {
             throw new EntityLoaderException(String.format(
                     "An error occurred while trying to find Id annotation for entity class: %s, message: %s",
-                            entityClass.getSimpleName(), e.getMessage()));
+                    entityClass.getSimpleName(), e.getMessage()));
         }
     }
 
