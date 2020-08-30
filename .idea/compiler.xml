@@ -6,8 +6,8 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="wORM" />
         <module name="worm" />
+        <module name="wORM" />
       </profile>
     </annotationProcessing>
   </component>

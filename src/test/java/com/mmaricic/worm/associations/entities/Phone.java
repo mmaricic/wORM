@@ -1,4 +1,4 @@
-package com.mmaricic.worm.associations;
+package com.mmaricic.worm.associations.entities;
 
 import javax.persistence.*;
 

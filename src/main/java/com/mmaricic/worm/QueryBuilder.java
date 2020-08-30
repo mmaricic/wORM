@@ -4,8 +4,8 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
 
-public class QueryBuilder {
-    public static String buildInsertQuery(String tableName, Map<String, Object> entityElements) {
+class QueryBuilder {
+    static String buildInsertQuery(String tableName, Map<String, Object> entityElements) {
         StringBuilder columns = new StringBuilder();
         StringBuilder values = new StringBuilder();
 
@@ -28,7 +28,7 @@ public class QueryBuilder {
         return query.toString();
     }
 
-    public static String buildDeleteQuery(String tableName, String idColumn, Object idValue) {
+    static String buildDeleteQuery(String tableName, String idColumn, Object idValue) {
         StringBuilder query = new StringBuilder("DELETE FROM ");
         query.append(tableName);
         query.append(" WHERE ");
@@ -38,7 +38,7 @@ public class QueryBuilder {
     }
 
 
-    private static String objToString(Object obj) {
+    static String objToString(Object obj) {
         String res = obj.toString();
         if (Number.class.isAssignableFrom(obj.getClass())) {
             return res;
@@ -49,7 +49,7 @@ public class QueryBuilder {
         return "'" + res + "'";
     }
 
-    public static String buildUpdateQuery(
+    static String buildUpdateQuery(
             String tableName, Map<String, Object> entityElements, String idColumn, Object idValue) {
         StringBuilder query = new StringBuilder("UPDATE ");
         query.append(tableName);
@@ -72,7 +72,7 @@ public class QueryBuilder {
         return query.toString();
     }
 
-    public static String buildFindByIdQuery(String tableName, String idColumn, Object idValue) {
+    static String buildFindByIdQuery(String tableName, String idColumn, Object idValue) {
         StringBuilder query = new StringBuilder("SELECT * FROM ");
         query.append(tableName);
         query.append(" WHERE ");
@@ -81,7 +81,7 @@ public class QueryBuilder {
         return query.toString();
     }
 
-    public static String buildFindQuery(String tableName) {
+    static String buildFindQuery(String tableName) {
         StringBuilder query = new StringBuilder("SELECT * FROM ");
         query.append(tableName);
         return query.toString();

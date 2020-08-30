@@ -1,4 +1,4 @@
-package com.mmaricic.worm.associations;
+package com.mmaricic.worm.associations.entities;
 
 import javax.persistence.*;
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ public class Company {
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL)
     private Phone phoneNumber;
     @OneToMany(cascade = CascadeType.ALL)
-    @JoinColumn(name = "company_id")
+    //@JoinColumn(name = "company_id")
     private List<User> employees = new ArrayList<>();
 
     public Company(String name) {
@@ -64,5 +64,15 @@ public class Company {
 
     public void setPhoneNumber(Phone phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public void addEmployee(User user) {
+        employees.add(user);
+        user.setWorkplace(this);
+    }
+
+    public void removeEmployee(User user) {
+        employees.remove(user);
+        user.setWorkplace(null);
     }
 }

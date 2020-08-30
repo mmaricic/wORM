@@ -26,6 +26,8 @@ public class EntityManager {
     }
 
     boolean save(Object entity, Map<String, Object> parentsIds) {
+        if (entity == null)
+            return false;
         if (parentsIds == null) {
             parentsIds = new LinkedHashMap<>();
         }
@@ -58,7 +60,7 @@ public class EntityManager {
                 idField.setAccessible(true);
                 idField.set(entity, getValue(generatedKeys, idField.getType()));
 
-                return annotationHandler.saveAssociatedChildren(entity);
+                return annotationHandler.saveAssociations(entity);
             } else
                 return false;
 
@@ -84,7 +86,9 @@ public class EntityManager {
     }
 
     public boolean delete(Object entity) {
-        annotationHandler.deleteChildren(entity);
+        if (entity == null)
+            return false;
+        annotationHandler.deleteAssociations(entity);
         String tableName = entityParser.extactTableName(entity.getClass());
         AbstractMap.SimpleEntry<String, Object> id = entityParser.extractId(entity);
         String sql = QueryBuilder.buildDeleteQuery(tableName, id.getKey(), id.getValue());
@@ -104,6 +108,8 @@ public class EntityManager {
     }
 
     boolean update(Object entity, Map<String, Object> parentIds) {
+        if (entity == null)
+            return false;
         if (parentIds == null) {
             parentIds = new LinkedHashMap<>();
         }
@@ -119,7 +125,7 @@ public class EntityManager {
             int res = stm.executeUpdate(sql);
             if (res == 0)
                 return false;
-            return annotationHandler.saveAssociatedChildren(entity);
+            return annotationHandler.saveAssociations(entity);
         } catch (SQLException e) {
             throw new QueryException(
                     String.format("An error occurred while trying to update an entity of class %s. Error: %s",

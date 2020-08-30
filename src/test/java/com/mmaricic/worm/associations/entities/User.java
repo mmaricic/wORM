@@ -1,4 +1,4 @@
-package com.mmaricic.worm.associations;
+package com.mmaricic.worm.associations.entities;
 
 import javax.persistence.*;
 import java.util.ArrayList;
@@ -13,9 +13,9 @@ public class User {
     @ManyToOne
     @JoinColumn(name = "company_id")
     private Company workplace;
-    @ManyToMany
+    @ManyToMany(cascade = CascadeType.PERSIST)
     @JoinTable(name = "user_address", joinColumns = @JoinColumn(name = "user_id"))
-    private List<Address> adresses = new ArrayList<>();
+    private List<Address> addresses = new ArrayList<>();
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "owner")
     private List<Phone> phones = new ArrayList<>();
     @OneToOne(mappedBy = "CEO")
@@ -53,12 +53,12 @@ public class User {
         this.workplace = workplace;
     }
 
-    public List<Address> getAdresses() {
-        return adresses;
+    public List<Address> getAddresses() {
+        return addresses;
     }
 
-    public void setAdresses(List<Address> adresses) {
-        this.adresses = adresses;
+    public void setAddresses(List<Address> addresses) {
+        this.addresses = addresses;
     }
 
     public List<Phone> getPhones() {
@@ -85,5 +85,13 @@ public class User {
 
     public void setOwnerOf(Company ownerOf) {
         this.ownerOf = ownerOf;
+    }
+
+    public void addAddress(Address a) {
+        addresses.add(a);
+    }
+
+    public void removeAddress(Address a) {
+        addresses.remove(a);
     }
 }

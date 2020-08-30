@@ -1,8 +1,8 @@
-package com.mmaricic.worm.associations;
+package com.mmaricic.worm.associations.entities;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
+import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 public class Address {
@@ -10,6 +10,7 @@ public class Address {
     private String street;
     private String city;
     private String country;
+    private List<User> residents = new ArrayList<>();
 
     public Address(String street, String city, String country) {
         this.street = street;
@@ -52,5 +53,22 @@ public class Address {
 
     public void setCountry(String country) {
         this.country = country;
+    }
+
+    @ManyToMany(mappedBy = "addresses", cascade = CascadeType.PERSIST)
+    public List<User> getResidents() {
+        return residents;
+    }
+
+    public void setResidents(List<User> residents) {
+        this.residents = residents;
+    }
+
+    public void addResident(User u) {
+        residents.add(u);
+    }
+
+    public void removeResident(User u) {
+        residents.remove(u);
     }
 }

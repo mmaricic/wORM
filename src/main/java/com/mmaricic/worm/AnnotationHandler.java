@@ -37,7 +37,7 @@ class AnnotationHandler {
                     assocField.setAccessible(true);
                     Object parent = assocField.get(entity);
                     if (parent != null) {
-                        String key = extractForeignKeyColumnName(assocField, parent.getClass());
+                        String key = extractForeignKeyColumnName(assocField, parent.getClass(), entity.getClass());
                         Object value = extractForeignKeyValue(parent, entity.getClass());
                         ids.put(key, value);
                     }
@@ -55,7 +55,7 @@ class AnnotationHandler {
                 for (Method getMethod : associations) {
                     Object parent = getMethod.invoke(entity);
                     if (parent != null) {
-                        String key = extractForeignKeyColumnName(getMethod, parent.getClass());
+                        String key = extractForeignKeyColumnName(getMethod, parent.getClass(), entity.getClass());
                         Object value = extractForeignKeyValue(parent, entity.getClass());
                         ids.put(key, value);
                     }
@@ -67,10 +67,10 @@ class AnnotationHandler {
         return ids;
     }
 
-    private String extractForeignKeyColumnName(AnnotatedElement ae, Class<?> annotatedElementClass) {
-
+    private String extractForeignKeyColumnName(AnnotatedElement ae, Class<?> annotatedElementClass, Class<?> entityClass) {
         if (ae.getAnnotation(JoinColumn.class) != null)
             return ae.getAnnotation(JoinColumn.class).name();
+
         String mappedBy = getMappedBy(ae);
         if (!mappedBy.isEmpty()) {
             Field field;
@@ -92,7 +92,7 @@ class AnnotationHandler {
             return mappedBy + "_id";
         }
 
-        return ep.extactTableName(annotatedElementClass) + "_id";
+        return ep.extactTableName(entityClass) + "_id";
     }
 
     private Object extractForeignKeyValue(Object relatedEntity, Class<?> entityClass) {
@@ -107,11 +107,12 @@ class AnnotationHandler {
         return id;
     }
 
-    boolean saveAssociatedChildren(Object entity) {
+    boolean saveAssociations(Object entity) {
         try { // TODO: Sredi ovo
             if (ep.isIddAnnotationOnField(entity.getClass())) {
                 List<Field> associations = Stream.of(entity.getClass().getDeclaredFields())
                         .filter(field -> field.getAnnotation(OneToMany.class) != null
+                                || field.getAnnotation(ManyToMany.class) != null
                                 || (field.getAnnotation(OneToOne.class) != null
                                 && !field.getAnnotation(OneToOne.class).mappedBy().equals("")))
                         .collect(Collectors.toList());
@@ -120,29 +121,38 @@ class AnnotationHandler {
                     Set<CascadeType> cascades = getCascadeTypes(assocField);
                     if (!cascades.contains(CascadeType.ALL) && !cascades.contains(CascadeType.PERSIST))
                         continue;
-                    String mappedBy = getMappedBy(assocField);
                     assocField.setAccessible(true);
-                    if (Collection.class.isAssignableFrom(assocField.getType())) {
+                    if (assocField.getAnnotation(ManyToMany.class) != null) {
                         for (Object child : (Collection) assocField.get(entity)) {
-                            String key = extractForeignKeyColumnName(assocField, child.getClass());
+                            saveManyToMany(child, assocField, entity);
+                        }
+                        continue;
+                    }
+                    if (Collection.class.isAssignableFrom(assocField.getType()) && assocField.get(entity) != null) {
+                        for (Object child : (Collection) assocField.get(entity)) {
+                            String key = extractForeignKeyColumnName(assocField, child.getClass(), entity.getClass());
                             Object value = extractForeignKeyValue(entity, entity.getClass());
                             if (!updateChild(child, new HashMap<>(Map.of(key, value))))
                                 return false;
                         }
                     } else {
                         Object child = assocField.get(entity);
-                        String key = extractForeignKeyColumnName(assocField, child.getClass());
-                        Object value = extractForeignKeyValue(entity, entity.getClass());
-                        return updateChild(child, new HashMap<>(Map.of(key, value)));
+                        if (child != null) {
+                            String key = extractForeignKeyColumnName(assocField, child.getClass(), entity.getClass());
+                            Object value = extractForeignKeyValue(entity, entity.getClass());
+                            return updateChild(child, new HashMap<>(Map.of(key, value)));
+                        }
                     }
                 }
                 return true;
             }
+
             List<Method> associations = Stream
                     .of(Introspector.getBeanInfo(entity.getClass(), Object.class).getPropertyDescriptors())
                     .map(PropertyDescriptor::getReadMethod)
                     .filter(method -> (method != null
                             && (method.getAnnotation(OneToMany.class) != null
+                            || method.getAnnotation(ManyToMany.class) != null
                             || (method.getAnnotation(OneToOne.class) != null
                             && !method.getAnnotation(OneToOne.class).mappedBy().equals("")))))
                     .collect(Collectors.toList());
@@ -151,17 +161,22 @@ class AnnotationHandler {
                 Set<CascadeType> cascades = getCascadeTypes(getMethod);
                 if (!cascades.contains(CascadeType.ALL) && !cascades.contains(CascadeType.PERSIST))
                     continue;
-                String mappedBy = getMappedBy(getMethod);
+                if (getMethod.getAnnotation(ManyToMany.class) != null) {
+                    for (Object child : (Collection) getMethod.invoke(entity)) {
+                        saveManyToMany(child, getMethod, entity);
+                    }
+                    continue;
+                }
                 if (Collection.class.isAssignableFrom(getMethod.getReturnType())) {
                     for (Object child : (Collection) getMethod.invoke(entity)) {
-                        String key = extractForeignKeyColumnName(getMethod, child.getClass());
+                        String key = extractForeignKeyColumnName(getMethod, child.getClass(), entity.getClass());
                         Object value = extractForeignKeyValue(entity, entity.getClass());
                         if (!updateChild(child, new HashMap<>(Map.of(key, value))))
                             return false;
                     }
                 } else {
                     Object child = getMethod.invoke(entity);
-                    String key = extractForeignKeyColumnName(getMethod, child.getClass());
+                    String key = extractForeignKeyColumnName(getMethod, child.getClass(), entity.getClass());
                     Object value = extractForeignKeyValue(entity, entity.getClass());
                     if (!updateChild(child, new HashMap<>(Map.of(key, value))))
                         return false;
@@ -173,6 +188,80 @@ class AnnotationHandler {
             e.printStackTrace();
         }
         return false;
+    }
+
+    private void saveManyToMany(Object child, AnnotatedElement ae, Object entity) {
+        if (ae.getAnnotation(ManyToMany.class) == null)
+            return;
+        if (ep.extractId(child).getValue() == null) {
+            em.save(child);
+        }
+        AbstractMap.SimpleEntry<String, AssociationId> associationTableId = getIds(entity, child, ae);
+        AssociationId association = associationTableId.getValue();
+        List<Map<String, Object>> res = em.query(String.format("SELECT * FROM %s WHERE %s=%s AND %s=%s;"
+                , associationTableId.getKey(), association.col1, association.value1, association.col2, association.value2));
+        if (res.isEmpty()) {
+            em.executeUpdate(QueryBuilder.buildInsertQuery(associationTableId.getKey(),
+                    Map.of(association.col1, association.value1, association.col2, association.value2)));
+        }
+    }
+
+    private AbstractMap.SimpleEntry<String, AssociationId> getIds(Object entity, Object child, AnnotatedElement ae) {
+        AssociationId ids = new AssociationId();
+        String table = ep.extactTableName(entity.getClass()) + "_" + ep.extactTableName(child.getClass());
+        ids.col1 = ep.extactTableName(entity.getClass()) + "_id";
+        ids.col2 = ep.extactTableName(child.getClass()) + "_id";
+
+        JoinTable jt = ae.getAnnotation(JoinTable.class);
+        String mappedBy = ae.getAnnotation(ManyToMany.class).mappedBy();
+        if (jt != null) {
+            if (!jt.name().isEmpty()) {
+                table = jt.name();
+            }
+            for (JoinColumn jc : jt.joinColumns()) {
+                ids.col1 = jc.name();
+            }
+            for (JoinColumn jc : jt.inverseJoinColumns()) {
+                ids.col2 = jc.name();
+            }
+        }
+
+        if (jt == null && !mappedBy.isEmpty()) {
+            table = ep.extactTableName(child.getClass()) + "_" + ep.extactTableName(entity.getClass());
+            Field field;
+            try {
+                field = child.getClass().getDeclaredField(mappedBy);
+            } catch (NoSuchFieldException e) {
+                throw new EntityException(e.getMessage());
+            }
+            if (field.getAnnotation(JoinTable.class) == null) {
+                try {
+                    PropertyDescriptor descriptor = new PropertyDescriptor(mappedBy, child.getClass());
+                    Method getMethod = descriptor.getReadMethod();
+                    if (getMethod != null && getMethod.getAnnotation(JoinTable.class) != null) {
+                        jt = getMethod.getAnnotation(JoinTable.class);
+                    }
+                } catch (IntrospectionException ignored) {
+                }
+            } else {
+                jt = field.getAnnotation(JoinTable.class);
+            }
+            if (jt != null) {
+                if (!jt.name().isEmpty()) {
+                    table = jt.name();
+                }
+                for (JoinColumn jc : jt.joinColumns()) {
+                    ids.col2 = jc.name();
+                }
+                for (JoinColumn jc : jt.inverseJoinColumns()) {
+                    ids.col1 = jc.name();
+                }
+            }
+        }
+
+        ids.value1 = ep.extractId(entity).getValue();
+        ids.value2 = ep.extractId(child).getValue();
+        return new AbstractMap.SimpleEntry<>(table, ids);
     }
 
     private String getMappedBy(AnnotatedElement ae) {
@@ -209,7 +298,7 @@ class AnnotationHandler {
         return em.save(child, associationId);
     }
 
-    void deleteChildren(Object entity) {
+    void deleteAssociations(Object entity) {
         try { // TODO: Sredi ovo
             if (ep.isIddAnnotationOnField(entity.getClass())) {
                 List<Field> associations = Stream.of(entity.getClass().getDeclaredFields())
@@ -220,15 +309,17 @@ class AnnotationHandler {
 
                 for (Field assocField : associations) {
                     Set<CascadeType> cascades = getCascadeTypes(assocField);
-                    if (!cascades.contains(CascadeType.ALL) && !cascades.contains(CascadeType.REMOVE))
-                        continue;
                     assocField.setAccessible(true);
                     if (!Collection.class.isAssignableFrom(assocField.getType())) {
-                        em.delete(assocField.get(entity));
+                        if (cascades.contains(CascadeType.ALL) || cascades.contains(CascadeType.REMOVE))
+                            em.delete(assocField.get(entity));
+                        deleteManyToMany(assocField.get(entity), assocField, entity);
                         continue;
                     }
                     for (Object child : (Collection) assocField.get(entity)) {
-                        em.delete(child);
+                        if (cascades.contains(CascadeType.ALL) || cascades.contains(CascadeType.REMOVE))
+                            em.delete(child);
+                        deleteManyToMany(child, assocField, entity);
                     }
                 }
                 return;
@@ -244,18 +335,39 @@ class AnnotationHandler {
 
             for (Method getMethod : associations) {
                 Set<CascadeType> cascades = getCascadeTypes(getMethod);
-                if (!cascades.contains(CascadeType.ALL) && !cascades.contains(CascadeType.REMOVE))
-                    continue;
+
                 if (!Collection.class.isAssignableFrom(getMethod.getReturnType())) {
-                    em.delete(getMethod.invoke(entity));
+                    if (cascades.contains(CascadeType.ALL) || cascades.contains(CascadeType.REMOVE))
+                        em.delete(getMethod.invoke(entity));
+                    deleteManyToMany(getMethod.invoke(entity), getMethod, entity);
                     continue;
                 }
                 for (Object child : (Collection) getMethod.invoke(entity)) {
-                    em.delete(child);
+                    if (cascades.contains(CascadeType.ALL) || cascades.contains(CascadeType.REMOVE))
+                        em.delete(child);
+                    deleteManyToMany(child, getMethod, entity);
+
                 }
             }
         } catch (IllegalAccessException | InvocationTargetException | IntrospectionException e) {
             e.printStackTrace();
         }
     }
+
+    private void deleteManyToMany(Object child, AnnotatedElement ae, Object entity) {
+        if (ae.getAnnotation(ManyToMany.class) == null)
+            return;
+        AbstractMap.SimpleEntry<String, AssociationId> associationTableId = getIds(entity, child, ae);
+        AssociationId association = associationTableId.getValue();
+        em.executeUpdate(QueryBuilder.buildDeleteQuery(
+                associationTableId.getKey(), association.col1, association.value1));
+    }
+
+    private class AssociationId {
+        String col1;
+        String col2;
+        Object value1;
+        Object value2;
+    }
+
 }

@@ -2,6 +2,10 @@ package com.mmaricic.worm.associations;
 
 import com.mmaricic.worm.EntityManager;
 import com.mmaricic.worm.EntityManagerFactory;
+import com.mmaricic.worm.associations.entities.Address;
+import com.mmaricic.worm.associations.entities.Company;
+import com.mmaricic.worm.associations.entities.Phone;
+import com.mmaricic.worm.associations.entities.User;
 import com.mmaricic.worm.exceptions.EntityException;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -11,10 +15,12 @@ import org.junit.jupiter.api.Test;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AssociationsTest {
+public class AnnotationHandlerTest {
     private static final String DRIVER = "com.mysql.cj.jdbc.Driver";
     private static final String URL = "jdbc:mysql://localhost:3306/associations";
     private static final String USERNAME = "root";
@@ -106,6 +112,11 @@ public class AssociationsTest {
         em.save(user);
         em.save(phone);
 
+        Company company = new Company("company");
+        company.addEmployee(user);
+
+        em.save(company);
+
        /* User foundUser = em.find(User.class, user.getId());
 
         assertEquals(user.getName(), foundUser.getName());
@@ -192,5 +203,44 @@ public class AssociationsTest {
 
         assertNull(em.find(Company.class, company.getId()));
         assertNull(em.find(Phone.class, phone.getId()));
+    }
+
+    @Test
+    void ManyToMany() {
+        EntityManager em = EntityManagerFactory.getEntityManager();
+
+        User user = new User("john doe");
+        Address address = new Address("no name", "Belgrade", "Serbia");
+        user.addAddress(address);
+
+        em.save(user);
+
+        Address newAddress = new Address("address 2", "Belgrade", "Serbia");
+        User newUser = new User("new user");
+
+        newAddress.addResident(newUser);
+        newAddress.addResident(user);
+        newUser.addAddress(newAddress);
+
+        em.save(newAddress);
+
+        user.addAddress(newAddress);
+        em.update(user);
+
+        em.delete(user);
+        assertNull(em.find(User.class, user.getId()));
+        assertNotNull(em.find(Address.class, address.getId()));
+        assertNotNull(em.find(Address.class, newAddress.getId()));
+        List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + user.getId());
+        assertEquals(res.size(), 0);
+
+
+        em.delete(newAddress);
+
+        assertNull(em.find(Address.class, newAddress.getId()));
+        assertNotNull(em.find(User.class, newUser.getId()));
+
+        res = em.query("SELECT * FROM user_address WHERE address_id=" + newAddress.getId());
+        assertEquals(res.size(), 0);
     }
 }

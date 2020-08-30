@@ -32,7 +32,7 @@ class EntityParserTest {
 
         String entClass = ep.extactTableName(testEntity.getClass());
 
-        assertEquals(entClass, "TestEntity");
+        assertEquals(entClass, "testentity");
     }
 
     @Test
@@ -205,7 +205,7 @@ class EntityParserTest {
     @Test
     void reconstruct() {
         HashMap<String, Object> entityElements = new HashMap<>();
-        entityElements.put("id", 2);
+        entityElements.put("id", 2L);
         entityElements.put("home_address", "dummy");
         entityElements.put("email", "john@mail.com");
         entityElements.put("firstname", "john");
@@ -216,7 +216,7 @@ class EntityParserTest {
         EntityParser ep = new EntityParser();
         User user = ep.convertRowToEntity(User.class, entityElements, null);
 
-        assertEquals(user.getId(), (Object) 2);
+        assertEquals(user.getId(), (Object) 2L);
         assertEquals(user.getAddress(), "dummy");
         assertEquals(user.getEmail(), "john@mail.com");
         assertNull(user.getPassword());
