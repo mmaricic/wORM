@@ -8,7 +8,7 @@ import com.mmaricic.worm.associations.entities.Phone;
 import com.mmaricic.worm.associations.entities.User;
 import com.mmaricic.worm.exceptions.EntityException;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class AnnotationHandlerTest {
+public class AssociationHandlerTest {
     private static final String DRIVER = "com.mysql.cj.jdbc.Driver";
     private static final String URL = "jdbc:mysql://localhost:3306/associations";
     private static final String USERNAME = "root";
@@ -31,8 +31,8 @@ public class AnnotationHandlerTest {
         EntityManagerFactory.configureDatabase(DRIVER, URL, USERNAME, PASSWORD);
     }
 
-    @AfterEach
-    void tearDown() {
+    @AfterAll
+    static void tearDown() {
         BasicDataSource bds = new BasicDataSource();
         bds.setDriverClassName(DRIVER);
         bds.setUrl(URL);
@@ -66,30 +66,38 @@ public class AnnotationHandlerTest {
         user.addPhone(oldPhone);
         em.save(user);
 
-       /* User foundUser = em.find(User.class, user.getId());
+        User foundUser = em.find(User.class, user.getId());
 
         assertEquals(user.getId(), foundUser.getId());
         assertEquals(user.getName(), foundUser.getName());
         List<Phone> phones = foundUser.getPhones();
-        assertEquals(phones.size(), 2);
-        assertEquals(phones.get(0).getNumber(), phone1.getNumber());
-        assertEquals(phones.get(1).getNumber(), phone2.getNumber());*/
+        assertEquals(phones.size(), 3);
+        assertEquals(phones.get(0).getNumber(), oldPhone.getNumber());
+        assertEquals(phones.get(1).getNumber(), phone1.getNumber());
+        assertEquals(phones.get(2).getNumber(), phone2.getNumber());
 
         user.setName("new name");
         phone1.setNumber("000000");
         Phone phone3 = new Phone("999999");
         user.addPhone(phone3);
+        user.removePhone(oldPhone);
 
         em.update(user);
 
-       /* foundUser = em.find(User.class, user.getId());
+        foundUser = em.find(User.class, user.getId());
         assertEquals(user.getName(), foundUser.getName());
         phones = foundUser.getPhones();
         assertEquals(phones.size(), 3);
         Phone updatedPhone = em.find(Phone.class, phone1.getId());
         assertEquals(phone1.getNumber(), updatedPhone.getNumber());
         Phone newPhone = em.find(Phone.class, phone3.getId());
-        assertEquals(phone3.getNumber(), newPhone.getNumber());*/
+        assertEquals(phone3.getNumber(), newPhone.getNumber());
+        assertNull(em.find(Phone.class, oldPhone.getId()));
+
+        phone3.setOwner(null);
+        em.update(phone3);
+        updatedPhone = em.find(Phone.class, phone3.getId());
+        assertNull(updatedPhone.getOwner());
 
         em.delete(user);
 
@@ -111,19 +119,19 @@ public class AnnotationHandlerTest {
 
         em.save(user);
         em.save(phone);
-
+        user.addPhone(phone);
         Company company = new Company("company");
         company.addEmployee(user);
 
         em.save(company);
 
-       /* User foundUser = em.find(User.class, user.getId());
+        User foundUser = em.find(User.class, user.getId());
 
         assertEquals(user.getName(), foundUser.getName());
         List<Phone> phones = foundUser.getPhones();
         assertEquals(phones.size(), 1);
         assertEquals(phones.get(0).getNumber(), phone.getNumber());
-*/
+
         user.setName("new name");
         phone.setNumber("000000");
         Phone phone2 = new Phone("999999");
@@ -131,23 +139,41 @@ public class AnnotationHandlerTest {
 
         em.update(phone);
 
-        /*Phone foundPhone = em.find(Phone.class, phone.getId());
+        Phone foundPhone = em.find(Phone.class, phone.getId());
         assertEquals(phone.getNumber(), foundPhone.getNumber());
         foundUser = foundPhone.getOwner();
-        assertEquals(user.getName(), foundUser.getName());
+        assertNotEquals(user.getName(), foundUser.getName());
         assertEquals(user.getId(), foundUser.getId());
+        phones = foundUser.getPhones();
+        assertEquals(phones.size(), 1);
+
+        em.update(user);
+        foundUser = em.find(User.class, user.getId());
         phones = foundUser.getPhones();
         assertEquals(phones.size(), 2);
         assertEquals(phones.get(0).getId(), phone.getId());
-        assertEquals(phones.get(1).getNumber(), phone2.getNumber());*/
+        assertEquals(phones.get(1).getId(), phone2.getId());
+
+        user.removePhone(phone2);
+        Phone newPhone = new Phone("66666");
+        user.addPhone(newPhone);
         em.update(user);
+        assertNull(em.find(Phone.class, phone2.getId()));
+        assertNotNull(em.find(Phone.class, newPhone.getId()));
+        company.removeEmployee(user);
+        em.update(company);
+        assertEquals(em.find(Company.class, company.getId()).getEmployees().size(), 0);
+        assertNotNull(em.find(User.class, user.getId()));
+
         em.delete(phone);
 
-        User foundUser = em.find(User.class, user.getId());
+        foundUser = em.find(User.class, user.getId());
         assertNotNull(foundUser);
-        //assertEquals(foundUser.getPhones().size(), 1);
-        assertNull(em.find(Phone.class, phone.getId()));
-        assertNotNull(em.find(Phone.class, phone2.getId()));
+        assertEquals(foundUser.getPhones().size(), 1);
+
+        em.delete(user);
+
+        assertNull(em.find(Phone.class, newPhone.getId()));
     }
 
     @Test
@@ -168,41 +194,28 @@ public class AnnotationHandlerTest {
         em.save(user);
         em.save(company);
 
-       /* User foundUser = em.find(User.class, user.getId());
+        Company foundCompany = em.find(Company.class, company.getId());
 
-        assertEquals(user.getName(), foundUser.getName());
-        List<Phone> phones = foundUser.getPhones();
-        assertEquals(phones.size(), 1);
-        assertEquals(phones.get(0).getNumber(), phone.getNumber());
-*/
+        assertEquals(company.getName(), foundCompany.getName());
+        assertEquals(phone.getNumber(), foundCompany.getPhoneNumber().getNumber());
+        assertEquals(user.getId(), foundCompany.getCEO().getId());
+
         company.setName("new company name");
         user.setName("new name");
         phone.setNumber("0000");
 
         em.update(company);
 
-        /*Phone foundPhone = em.find(Phone.class, phone.getId());
+        Phone foundPhone = em.find(Phone.class, phone.getId());
         assertEquals(phone.getNumber(), foundPhone.getNumber());
-        foundUser = foundPhone.getOwner();
-        assertEquals(user.getName(), foundUser.getName());
-        assertEquals(user.getId(), foundUser.getId());
-        phones = foundUser.getPhones();
-        assertEquals(phones.size(), 2);
-        assertEquals(phones.get(0).getId(), phone.getId());
-        assertEquals(phones.get(1).getNumber(), phone2.getNumber());*/
-        company.setName("user update name");
-        phone.setNumber("23456");
-        em.update(user);
-
-        em.delete(user);
-        assertNull(em.find(User.class, user.getId()));
-        assertNotNull(em.find(Company.class, company.getId()));
-        assertNotNull(em.find(Phone.class, phone.getId()));
+        User foundUser = em.find(User.class, user.getId());
+        assertNotEquals(user.getName(), foundUser.getName());
 
         em.delete(company);
 
         assertNull(em.find(Company.class, company.getId()));
         assertNull(em.find(Phone.class, phone.getId()));
+        assertNotNull(em.find(User.class, user.getId()));
     }
 
     @Test
@@ -215,30 +228,43 @@ public class AnnotationHandlerTest {
 
         em.save(user);
 
+       /* Address foundAddress = em.find(Address.class, address.getId());
+        assertEquals(foundAddress.getResidents().size(), 1);
+        assertEquals(foundAddress.getResidents().get(0).getName(), user.getName());*/
+
         Address newAddress = new Address("address 2", "Belgrade", "Serbia");
         User newUser = new User("new user");
-
         newAddress.addResident(newUser);
         newAddress.addResident(user);
-        newUser.addAddress(newAddress);
 
         em.save(newAddress);
 
+      /*  foundAddress = em.find(Address.class, newAddress.getId());
+        assertEquals(foundAddress.getResidents().size(), 2);
+        assertNotNull(em.find(User.class, newUser.getId()));*/
+
+        user.removeAddress(address);
         user.addAddress(newAddress);
+
         em.update(user);
 
-        em.delete(user);
-        assertNull(em.find(User.class, user.getId()));
+      /*  foundAddress = em.find(Address.class, address);
+        assertNotNull(foundAddress);
+        assertEquals(foundAddress.getResidents().size(), 1);
+        assertEquals(foundAddress.getResidents().get(0).getId(), newUser.getId());*/
+
+        em.delete(newUser);
+
+        assertNull(em.find(User.class, newUser.getId()));
         assertNotNull(em.find(Address.class, address.getId()));
         assertNotNull(em.find(Address.class, newAddress.getId()));
-        List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + user.getId());
+        List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + newUser.getId());
         assertEquals(res.size(), 0);
-
 
         em.delete(newAddress);
 
         assertNull(em.find(Address.class, newAddress.getId()));
-        assertNotNull(em.find(User.class, newUser.getId()));
+        assertNotNull(em.find(User.class, user.getId()));
 
         res = em.query("SELECT * FROM user_address WHERE address_id=" + newAddress.getId());
         assertEquals(res.size(), 0);

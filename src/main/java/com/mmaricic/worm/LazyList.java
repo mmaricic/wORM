@@ -9,19 +9,19 @@ public class LazyList<T> implements List<T> {
     private final StringJoiner sqlJoiner;
     private boolean firstWhereAdded = false;
     private final Class<T> entityClass;
-    private final EntityParser entityParser;
     private final EntityManager entityManager;
     private final List<String> orderBy = new ArrayList<>();
     private Integer limit = null;
     private Integer offset = null;
+    private boolean rawSql;
 
 
-    public LazyList(String sql, Class<T> entityClass, EntityManager entityManager) {
+    public LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql) {
         sqlJoiner = new StringJoiner(" ");
         sqlJoiner.add(sql);
         this.entityClass = entityClass;
-        entityParser = new EntityParser();
         this.entityManager = entityManager;
+        this.rawSql = rawSql;
     }
 
     public LazyList<T> where(String sql) {
@@ -94,6 +94,11 @@ public class LazyList<T> implements List<T> {
         if (delegate != null)
             return;
 
+        if (rawSql) {
+            delegate = entityManager.query(sqlJoiner.toString(), entityClass);
+            return;
+        }
+
         if (orderBy.size() > 0) {
             sqlJoiner.add("ORDER BY");
             StringJoiner orderJoin = new StringJoiner(", ");
@@ -109,11 +114,7 @@ public class LazyList<T> implements List<T> {
             sqlJoiner.add("OFFSET").add(offset.toString());
         }
 
-        List<Map<String, Object>> result = entityManager.query(sqlJoiner.toString() + ";");
-        delegate = new ArrayList<>();
-        for (Map<String, Object> row : result) {
-            delegate.add(entityParser.convertRowToEntity(entityClass, row, null));
-        }
+        delegate = entityManager.query(sqlJoiner.toString() + ";", entityClass);
     }
 
     @Override

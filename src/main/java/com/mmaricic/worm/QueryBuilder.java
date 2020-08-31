@@ -39,6 +39,8 @@ class QueryBuilder {
 
 
     static String objToString(Object obj) {
+        if (obj == null)
+            return "NULL";
         String res = obj.toString();
         if (Number.class.isAssignableFrom(obj.getClass())) {
             return res;

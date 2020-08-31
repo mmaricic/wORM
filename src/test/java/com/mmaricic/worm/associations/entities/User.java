@@ -16,10 +16,8 @@ public class User {
     @ManyToMany(cascade = CascadeType.PERSIST)
     @JoinTable(name = "user_address", joinColumns = @JoinColumn(name = "user_id"))
     private List<Address> addresses = new ArrayList<>();
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "owner")
+    @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "owner", orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Phone> phones = new ArrayList<>();
-    @OneToOne(mappedBy = "CEO")
-    private Company ownerOf;
 
 
     public User(String name) {
@@ -79,19 +77,13 @@ public class User {
         phone.setOwner(null);
     }
 
-    public Company getOwnerOf() {
-        return ownerOf;
-    }
-
-    public void setOwnerOf(Company ownerOf) {
-        this.ownerOf = ownerOf;
-    }
-
     public void addAddress(Address a) {
         addresses.add(a);
+        a.addResident(this);
     }
 
     public void removeAddress(Address a) {
+        a.removeResident(this);
         addresses.remove(a);
     }
 }

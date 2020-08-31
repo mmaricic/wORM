@@ -34,7 +34,7 @@ public class Phone {
         this.number = number;
     }
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "owner_id")
     public User getOwner() {
         return owner;

@@ -10,13 +10,12 @@ public class Company {
     @GeneratedValue
     private Long id;
     private String name;
-    @OneToOne
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "ceo_id")
     private User CEO;
     @OneToOne(mappedBy = "company", cascade = CascadeType.ALL)
     private Phone phoneNumber;
-    @OneToMany(cascade = CascadeType.ALL)
-    //@JoinColumn(name = "company_id")
+    @OneToMany(cascade = CascadeType.PERSIST)
     private List<User> employees = new ArrayList<>();
 
     public Company(String name) {
