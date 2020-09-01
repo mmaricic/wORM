@@ -175,18 +175,18 @@ class AssociationHandler {
                     em.save(child, null);
                 }
 
-                AbstractMap.SimpleEntry<String, AssociationId> associationTableId = getIds(entity, child, fieldAnnot);
-                AssociationId association = associationTableId.getValue();
-
+                ManyToManyTableId association = getManyToManyTableAndCols(entity.getClass(), child.getClass(), fieldAnnot);
+                Object entityColValue = ep.extractId(entity).getValue();
+                Object childColValue = ep.extractId(child).getValue();
                 List<Map<String, Object>> res = em.query(String.format("SELECT * FROM %s WHERE %s=%s AND %s=%s;",
-                        associationTableId.getKey(),
-                        association.firstCol, association.firstColValue,
-                        association.secondCol, association.secondColValue));
+                        association.tableName,
+                        association.entityCol, entityColValue,
+                        association.childCol, childColValue));
 
                 if (res.isEmpty()) {
-                    em.executeUpdate(QueryBuilder.buildInsertQuery(associationTableId.getKey(),
-                            Map.of(association.firstCol, association.firstColValue,
-                                    association.secondCol, association.secondColValue)));
+                    em.executeUpdate(QueryBuilder.buildInsertQuery(association.tableName,
+                            Map.of(association.entityCol, entityColValue,
+                                    association.childCol, childColValue)));
                 }
             }
             return true;
@@ -201,38 +201,38 @@ class AssociationHandler {
         return true;
     }
 
-    private AbstractMap.SimpleEntry<String, AssociationId> getIds(Object entity, Object child, AnnotatedElement ae)
+    private ManyToManyTableId getManyToManyTableAndCols(Class<?> entityClass, Class<?> childClass, AnnotatedElement ae)
             throws EntityIdException, EntityException {
-        AssociationId ids = new AssociationId();
-        String table = ep.extractTableName(entity.getClass()) + "_" + ep.extractTableName(child.getClass());
-        ids.firstCol = ep.extractTableName(entity.getClass()) + "_id";
-        ids.secondCol = ep.extractTableName(child.getClass()) + "_id";
+        ManyToManyTableId ids = new ManyToManyTableId();
+        ids.tableName = ep.extractTableName(entityClass) + "_" + ep.extractTableName(childClass);
+        ids.entityCol = ep.extractTableName(entityClass) + "_id";
+        ids.childCol = ep.extractTableName(childClass) + "_id";
 
         JoinTable jt = ae.getAnnotation(JoinTable.class);
         String mappedBy = ae.getAnnotation(ManyToMany.class).mappedBy();
         if (jt != null) {
             if (!jt.name().isEmpty()) {
-                table = jt.name();
+                ids.tableName = jt.name();
             }
             for (JoinColumn jc : jt.joinColumns()) {
-                ids.firstCol = jc.name();
+                ids.entityCol = jc.name();
             }
             for (JoinColumn jc : jt.inverseJoinColumns()) {
-                ids.secondCol = jc.name();
+                ids.childCol = jc.name();
             }
         }
 
         if (jt == null && !mappedBy.isEmpty()) {
-            table = ep.extractTableName(child.getClass()) + "_" + ep.extractTableName(entity.getClass());
+            ids.tableName = ep.extractTableName(childClass) + "_" + ep.extractTableName(entityClass);
             Field field;
             try {
-                field = child.getClass().getDeclaredField(mappedBy);
+                field = childClass.getDeclaredField(mappedBy);
             } catch (NoSuchFieldException e) {
                 throw new EntityException(e.getMessage());
             }
             if (field.getAnnotation(JoinTable.class) == null) {
                 try {
-                    PropertyDescriptor descriptor = new PropertyDescriptor(mappedBy, child.getClass());
+                    PropertyDescriptor descriptor = new PropertyDescriptor(mappedBy, childClass);
                     Method getMethod = descriptor.getReadMethod();
                     if (getMethod != null && getMethod.getAnnotation(JoinTable.class) != null) {
                         jt = getMethod.getAnnotation(JoinTable.class);
@@ -244,20 +244,17 @@ class AssociationHandler {
             }
             if (jt != null) {
                 if (!jt.name().isEmpty()) {
-                    table = jt.name();
+                    ids.tableName = jt.name();
                 }
                 for (JoinColumn jc : jt.joinColumns()) {
-                    ids.secondCol = jc.name();
+                    ids.childCol = jc.name();
                 }
                 for (JoinColumn jc : jt.inverseJoinColumns()) {
-                    ids.firstCol = jc.name();
+                    ids.entityCol = jc.name();
                 }
             }
         }
-
-        ids.firstColValue = ep.extractId(entity).getValue();
-        ids.secondColValue = ep.extractId(child).getValue();
-        return new AbstractMap.SimpleEntry<>(table, ids);
+        return ids;
     }
 
     private String getMappedBy(AnnotatedElement ae) {
@@ -340,10 +337,10 @@ class AssociationHandler {
             em.delete(fieldValue);
 
         if (fieldAnnot.getAnnotation(ManyToMany.class) != null) {
-            AbstractMap.SimpleEntry<String, AssociationId> associationTableId = getIds(entity, fieldValue, fieldAnnot);
-            AssociationId association = associationTableId.getValue();
+            Object entityColValue = ep.extractId(entity).getValue();
+            ManyToManyTableId association = getManyToManyTableAndCols(entity.getClass(), fieldValue.getClass(), fieldAnnot);
             em.executeUpdate(QueryBuilder.buildDeleteQuery(
-                    associationTableId.getKey(), association.firstCol, association.firstColValue));
+                    association.tableName, association.entityCol, entityColValue));
         }
     }
 
@@ -383,7 +380,9 @@ class AssociationHandler {
                         assocField.set(entity, fetchOneToOne(entity, assocField, assocField.getType()));
                     }
                     if (assocField.getAnnotation(ManyToMany.class) != null) {
-
+                        ParameterizedType collectionType = (ParameterizedType) assocField.getGenericType();
+                        Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
+                        assocField.set(entity, fetchManyToMany(entity, childrenType, assocField));
                     }
                 } catch (IllegalAccessException e) {
                     throw new EntityLoaderException(String.format("Field %s in class %s is inaccessible.",
@@ -403,50 +402,75 @@ class AssociationHandler {
                 Method setMehod = descriptor.getWriteMethod();
                 if (getMethod == null)
                     continue;
+                Object value = null;
 
                 if (getMethod.getAnnotation(OneToMany.class) != null) {
                     ParameterizedType collectionType = (ParameterizedType) getMethod.getGenericParameterTypes()[0];
                     Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
-                    List<?> res = fetchOneToMany(entity, getMethod, childrenType);
-                    if (setMehod != null)
-                        setMehod.invoke(entity, res);
-                    else {
-                        Field f = entity.getClass().getDeclaredField(descriptor.getName());
-                        f.setAccessible(true);
-                        f.set(entity, res);
-                    }
+                    value = fetchOneToMany(entity, getMethod, childrenType);
                 }
                 if (getMethod.getAnnotation(ManyToOne.class) != null
                         || getMethod.getAnnotation(OneToOne.class) != null
                         && getMethod.getAnnotation(OneToOne.class).mappedBy().isEmpty()) {
-                    Object res = fetchParent(entity, getMethod, getMethod.getReturnType(), entityMap);
-                    if (setMehod != null)
-                        setMehod.invoke(entity, res);
-                    else {
-                        Field f = entity.getClass().getDeclaredField(descriptor.getName());
-                        f.setAccessible(true);
-                        f.set(entity, res);
-                    }
+                    value = fetchParent(entity, getMethod, getMethod.getReturnType(), entityMap);
                 }
                 if (getMethod.getAnnotation(OneToOne.class) != null
                         && !getMethod.getAnnotation(OneToOne.class).mappedBy().isEmpty()) {
-                    Object res = fetchOneToOne(entity, getMethod, getMethod.getReturnType());
-                    if (setMehod != null)
-                        setMehod.invoke(entity, res);
-                    else {
-                        Field f = entity.getClass().getDeclaredField(descriptor.getName());
-                        f.setAccessible(true);
-                        f.set(entity, res);
-                    }
+                    value = fetchOneToOne(entity, getMethod, getMethod.getReturnType());
                 }
                 if (getMethod.getAnnotation(ManyToMany.class) != null) {
-
+                    ParameterizedType collectionType = (ParameterizedType) getMethod.getGenericReturnType();
+                    Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
+                    value = fetchManyToMany(entity, childrenType, getMethod);
+                }
+                if (setMehod != null)
+                    setMehod.invoke(entity, value);
+                else {
+                    Field f = entity.getClass().getDeclaredField(descriptor.getName());
+                    f.setAccessible(true);
+                    f.set(entity, value);
                 }
             }
         } catch (IntrospectionException | IllegalAccessException | InvocationTargetException | NoSuchFieldException e) {
             throw new EntityLoaderException("An error occurred while trying to set association fields for "
                     + entity.getClass().getSimpleName() + "entity: " + e.getMessage());
         }
+    }
+
+    private List<?> fetchManyToMany(Object entity, Class<?> manyToManyType, AnnotatedElement manyToManyAnnot) {
+        ManyToManyTableId manyToManyTableId = getManyToManyTableAndCols(entity.getClass(), manyToManyType, manyToManyAnnot);
+        Object entityId = ep.extractId(entity).getValue();
+        String childTable = ep.extractTableName(manyToManyType);
+        String childIdInTable = ep.extractIdColumnName(manyToManyType);
+        String selectAllQuery = String.format(
+                "SELECT %1$s.* FROM %1$s INNER JOIN %2$s ON %1$s.%3$s=%2$s.%4$s WHERE %2$s.%5$s=%6$s",
+                childTable, manyToManyTableId.tableName, childIdInTable, manyToManyTableId.childCol,
+                manyToManyTableId.entityCol, QueryBuilder.objToString(entityId));
+        if (manyToManyAnnot.getAnnotation(ManyToMany.class).fetch() == FetchType.LAZY) {
+            return new LazyList<>(selectAllQuery + ";", manyToManyType, em, true);
+        }
+        String selectIds = String.format("SELECT %s FROM %s WHERE %s=%s;",
+                manyToManyTableId.childCol,
+                manyToManyTableId.tableName,
+                manyToManyTableId.entityCol,
+                QueryBuilder.objToString(entityId));
+        List<Map<String, Object>> idQueryRes = em.query(selectIds);
+        List<Object> existingEntites = new ArrayList<>();
+        StringJoiner idsNotToFetch = new StringJoiner(" ");
+        for (Map<String, Object> childIdMap : idQueryRes) {
+            Object childId = childIdMap.get(manyToManyTableId.childCol);
+            Object child = em.getFromCache(manyToManyType, childId);
+            if (child != null) {
+                existingEntites.add(child);
+                idsNotToFetch.add("AND");
+                idsNotToFetch.add(manyToManyTableId.childCol).add("<>").add(QueryBuilder.objToString(childId));
+            }
+        }
+        if (existingEntites.size() < idQueryRes.size()) {
+            List<?> res = em.query(selectAllQuery + idsNotToFetch.toString() + ";", manyToManyType);
+            existingEntites.addAll(res);
+        }
+        return existingEntites;
     }
 
     private <T> Object fetchParent(T entity, AnnotatedElement ae, Class<?> oneType, Map<String, Object> entityMap)
@@ -549,7 +573,10 @@ class AssociationHandler {
                                 child == null ? child : Collections.singletonList(child));
                     }
                     if (field.getAnnotation(ManyToMany.class) != null) {
-
+                        ParameterizedType collectionType = (ParameterizedType) field.getGenericType();
+                        Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
+                        Object children = field.get(entity);
+                        removeOldAssociationTableEntries(entity, children, childrenType, field);
                     }
                 }
                 return;
@@ -571,15 +598,37 @@ class AssociationHandler {
                     Object child = method.invoke(entity);
                     removeLinksForChildren(entity, method, method.getReturnType(),
                             child == null ? child : Collections.singletonList(child));
-
                 }
                 if (method.getAnnotation(ManyToMany.class) != null) {
-
+                    ParameterizedType collectionType = (ParameterizedType) method.getGenericReturnType();
+                    Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
+                    removeOldAssociationTableEntries(entity, method.invoke(entity), childrenType, method);
                 }
             }
         } catch (IllegalAccessException | IntrospectionException | InvocationTargetException e) {
             e.printStackTrace();
         }
+    }
+
+    private void removeOldAssociationTableEntries(
+            Object entity, Object relatedEntites, Class<?> relatedEntityClass, AnnotatedElement relatedEntityAnnot) {
+        ManyToManyTableId manyToManyTableId = getManyToManyTableAndCols(
+                entity.getClass(), relatedEntityClass, relatedEntityAnnot);
+        String sql = String.format("DELETE FROM %1$S WHERE %2$s=%3$s ",
+                manyToManyTableId.tableName,
+                manyToManyTableId.entityCol,
+                QueryBuilder.objToString(ep.extractId(entity).getValue()));
+        if (relatedEntites != null) {
+            StringJoiner where = new StringJoiner(" ");
+            for (Object child : (Collection) relatedEntites) {
+                where.add("AND");
+                Object id = ep.extractId(child).getValue();
+                where.add(manyToManyTableId.childCol).add("<>").add(QueryBuilder.objToString(id));
+            }
+            sql += where.toString();
+        }
+        sql += ";";
+        em.executeUpdate(sql);
     }
 
     private void removeLinksForChildren(Object entity, AnnotatedElement ae, Class<?> childType, Object children)
@@ -607,10 +656,9 @@ class AssociationHandler {
         em.executeUpdate(sql);
     }
 
-    private class AssociationId {
-        String firstCol;
-        String secondCol;
-        Object firstColValue;
-        Object secondColValue;
+    private class ManyToManyTableId {
+        String tableName;
+        String entityCol;
+        String childCol;
     }
 }

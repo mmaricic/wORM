@@ -314,7 +314,7 @@ public class EntityManager {
         classCache.put(entityParser.extractId(entity).getValue(), entity);
     }
 
-    private Object getFromCache(Class<?> entityClass, Object id) {
+    Object getFromCache(Class<?> entityClass, Object id) {
         if (cache == null)
             return null;
         Map<Object, Object> classCache = cache.get(entityClass);

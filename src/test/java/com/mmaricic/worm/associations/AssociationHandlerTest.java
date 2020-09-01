@@ -229,35 +229,37 @@ public class AssociationHandlerTest {
 
         em.save(user);
 
-       /* Address foundAddress = em.find(Address.class, address.getId());
+        Address foundAddress = em.find(Address.class, address.getId());
         assertEquals(1, foundAddress.getResidents().size());
-        assertEquals(user.getName(), foundAddress.getResidents().get(0).getName());*/
+        assertEquals(user.getName(), foundAddress.getResidents().get(0).getName());
 
         Address newAddress = new Address("address 2", "Belgrade", "Serbia");
         User newUser = new User("new user");
         newAddress.addResident(newUser);
+        newUser.addAddress(newAddress);
         newAddress.addResident(user);
+        user.addAddress(newAddress);
 
         em.save(newAddress);
 
-      /*  foundAddress = em.find(Address.class, newAddress.getId());
+        foundAddress = em.find(Address.class, newAddress.getId());
         assertEquals(2, foundAddress.getResidents().size());
-        assertNotNull(em.find(User.class, newUser.getId()));*/
+        assertNotNull(em.find(User.class, newUser.getId()));
 
         user.removeAddress(address);
         user.addAddress(newAddress);
 
         em.update(user);
 
-      /*  foundAddress = em.find(Address.class, address);
-        assertNotNull(foundAddress);
-        assertEquals(1, foundAddress.getResidents().size());
-        assertEquals(newUser.getId(), foundAddress.getResidents().get(0).getId());*/
+        foundAddress = em.find(Address.class, address.getId());
+        assertEquals(0, foundAddress.getResidents().size());
+
+        User foundUser = em.find(User.class, user.getId());
+        assertEquals(1, foundUser.getAddresses().size());
 
         em.delete(newUser);
 
         assertNull(em.find(User.class, newUser.getId()));
-        assertNotNull(em.find(Address.class, address.getId()));
         assertNotNull(em.find(Address.class, newAddress.getId()));
         List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + newUser.getId());
         assertEquals(0, res.size());
