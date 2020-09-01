@@ -32,7 +32,7 @@ public class AssociationHandlerTest {
     }
 
     @AfterAll
-    static void tearDown() {
+    static void tearDown() throws Exception {
         BasicDataSource bds = new BasicDataSource();
         bds.setDriverClassName(DRIVER);
         bds.setUrl(URL);
@@ -50,6 +50,7 @@ public class AssociationHandlerTest {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        EntityManagerFactory.removeConfiguration();
     }
 
     @Test

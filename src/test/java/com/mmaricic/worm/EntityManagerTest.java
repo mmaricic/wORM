@@ -6,6 +6,7 @@ import com.mmaricic.worm.exceptions.EntityIdException;
 import com.mmaricic.worm.helpers.Company;
 import com.mmaricic.worm.helpers.User;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -31,6 +32,11 @@ class EntityManagerTest {
     @BeforeAll
     static void setUp() {
         EntityManagerFactory.configureDatabase(DRIVER, URL, USERNAME, PASSWORD);
+    }
+
+    @AfterAll
+    static void removeConfig() throws Exception {
+        EntityManagerFactory.removeConfiguration();
     }
 
     @AfterEach
