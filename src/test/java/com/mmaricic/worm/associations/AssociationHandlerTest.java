@@ -71,10 +71,10 @@ public class AssociationHandlerTest {
         assertEquals(user.getId(), foundUser.getId());
         assertEquals(user.getName(), foundUser.getName());
         List<Phone> phones = foundUser.getPhones();
-        assertEquals(phones.size(), 3);
-        assertEquals(phones.get(0).getNumber(), oldPhone.getNumber());
-        assertEquals(phones.get(1).getNumber(), phone1.getNumber());
-        assertEquals(phones.get(2).getNumber(), phone2.getNumber());
+        assertEquals(3, phones.size());
+        assertEquals(oldPhone.getNumber(), phones.get(0).getNumber());
+        assertEquals(phone1.getNumber(), phones.get(1).getNumber());
+        assertEquals(phone2.getNumber(), phones.get(2).getNumber());
 
         user.setName("new name");
         phone1.setNumber("000000");
@@ -86,10 +86,11 @@ public class AssociationHandlerTest {
 
         foundUser = em.find(User.class, user.getId());
         assertEquals(user.getName(), foundUser.getName());
-        phones = foundUser.getPhones();
-        assertEquals(phones.size(), 3);
+        assertEquals(3, foundUser.getPhones().size());
+
         Phone updatedPhone = em.find(Phone.class, phone1.getId());
         assertEquals(phone1.getNumber(), updatedPhone.getNumber());
+
         Phone newPhone = em.find(Phone.class, phone3.getId());
         assertEquals(phone3.getNumber(), newPhone.getNumber());
         assertNull(em.find(Phone.class, oldPhone.getId()));
@@ -129,8 +130,8 @@ public class AssociationHandlerTest {
 
         assertEquals(user.getName(), foundUser.getName());
         List<Phone> phones = foundUser.getPhones();
-        assertEquals(phones.size(), 1);
-        assertEquals(phones.get(0).getNumber(), phone.getNumber());
+        assertEquals(1, phones.size());
+        assertEquals(phone.getNumber(), phones.get(0).getNumber());
 
         user.setName("new name");
         phone.setNumber("000000");
@@ -145,14 +146,14 @@ public class AssociationHandlerTest {
         assertNotEquals(user.getName(), foundUser.getName());
         assertEquals(user.getId(), foundUser.getId());
         phones = foundUser.getPhones();
-        assertEquals(phones.size(), 1);
+        assertEquals(1, phones.size());
 
         em.update(user);
         foundUser = em.find(User.class, user.getId());
         phones = foundUser.getPhones();
-        assertEquals(phones.size(), 2);
-        assertEquals(phones.get(0).getId(), phone.getId());
-        assertEquals(phones.get(1).getId(), phone2.getId());
+        assertEquals(2, phones.size());
+        assertEquals(phone.getId(), phones.get(0).getId());
+        assertEquals(phone2.getId(), phones.get(1).getId());
 
         user.removePhone(phone2);
         Phone newPhone = new Phone("66666");
@@ -162,14 +163,14 @@ public class AssociationHandlerTest {
         assertNotNull(em.find(Phone.class, newPhone.getId()));
         company.removeEmployee(user);
         em.update(company);
-        assertEquals(em.find(Company.class, company.getId()).getEmployees().size(), 0);
+        assertEquals(0, em.find(Company.class, company.getId()).getEmployees().size());
         assertNotNull(em.find(User.class, user.getId()));
 
         em.delete(phone);
 
         foundUser = em.find(User.class, user.getId());
         assertNotNull(foundUser);
-        assertEquals(foundUser.getPhones().size(), 1);
+        assertEquals(1, foundUser.getPhones().size());
 
         em.delete(user);
 
@@ -229,8 +230,8 @@ public class AssociationHandlerTest {
         em.save(user);
 
        /* Address foundAddress = em.find(Address.class, address.getId());
-        assertEquals(foundAddress.getResidents().size(), 1);
-        assertEquals(foundAddress.getResidents().get(0).getName(), user.getName());*/
+        assertEquals(1, foundAddress.getResidents().size());
+        assertEquals(user.getName(), foundAddress.getResidents().get(0).getName());*/
 
         Address newAddress = new Address("address 2", "Belgrade", "Serbia");
         User newUser = new User("new user");
@@ -240,7 +241,7 @@ public class AssociationHandlerTest {
         em.save(newAddress);
 
       /*  foundAddress = em.find(Address.class, newAddress.getId());
-        assertEquals(foundAddress.getResidents().size(), 2);
+        assertEquals(2, foundAddress.getResidents().size());
         assertNotNull(em.find(User.class, newUser.getId()));*/
 
         user.removeAddress(address);
@@ -250,8 +251,8 @@ public class AssociationHandlerTest {
 
       /*  foundAddress = em.find(Address.class, address);
         assertNotNull(foundAddress);
-        assertEquals(foundAddress.getResidents().size(), 1);
-        assertEquals(foundAddress.getResidents().get(0).getId(), newUser.getId());*/
+        assertEquals(1, foundAddress.getResidents().size());
+        assertEquals(newUser.getId(), foundAddress.getResidents().get(0).getId());*/
 
         em.delete(newUser);
 
@@ -259,7 +260,7 @@ public class AssociationHandlerTest {
         assertNotNull(em.find(Address.class, address.getId()));
         assertNotNull(em.find(Address.class, newAddress.getId()));
         List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + newUser.getId());
-        assertEquals(res.size(), 0);
+        assertEquals(0, res.size());
 
         em.delete(newAddress);
 
@@ -267,6 +268,6 @@ public class AssociationHandlerTest {
         assertNotNull(em.find(User.class, user.getId()));
 
         res = em.query("SELECT * FROM user_address WHERE address_id=" + newAddress.getId());
-        assertEquals(res.size(), 0);
+        assertEquals(0, res.size());
     }
 }

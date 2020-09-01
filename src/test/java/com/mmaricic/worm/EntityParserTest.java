@@ -34,7 +34,7 @@ class EntityParserTest {
 
         String entClass = ep.extractTableName(testEntity.getClass());
 
-        assertEquals(entClass, "testentity");
+        assertEquals("testentity", entClass);
     }
 
     @Test
@@ -50,7 +50,7 @@ class EntityParserTest {
 
         String entClass = ep.extractTableName(testEntity.getClass());
 
-        assertEquals(entClass, tableName);
+        assertEquals(tableName, entClass);
     }
 
     @Test
@@ -217,13 +217,13 @@ class EntityParserTest {
         EntityParser ep = new EntityParser();
         User user = ep.convertRowToEntity(User.class, entityElements, null);
 
-        assertEquals(user.getId(), (Object) 2L);
-        assertEquals(user.getAddress(), "dummy");
-        assertEquals(user.getEmail(), "john@mail.com");
+        assertEquals((Object) 2L, user.getId());
+        assertEquals("dummy", user.getAddress());
+        assertEquals("john@mail.com", user.getEmail());
         assertNull(user.getPassword());
         assertNotNull(user.getName());
-        assertEquals(user.getName().getFirstname(), "john");
-        assertEquals(user.getName().getLastname(), "doe");
+        assertEquals("john", user.getName().getFirstname());
+        assertEquals("doe", user.getName().getLastname());
 
     }
 
@@ -243,20 +243,20 @@ class EntityParserTest {
         EntityParser ep = new EntityParser();
         Company company = ep.convertRowToEntity(Company.class, entityElements, null);
 
-        assertEquals(company.getId(), (Object) 1);
+        assertEquals((Object) 1, company.getId());
         Company.Address address = company.getAddress();
-        assertEquals(address.getStreetName(), "no name");
-        assertEquals(address.getHouseNumber(), 9);
-        assertEquals(address.getCity(), "Belgrade");
-        assertEquals(address.getCountry(), "Serbia");
-        assertEquals(company.getFoundingDate(), formatter.parse(formatter.format(calendar.getTime())));
+        assertEquals("no name", address.getStreetName());
+        assertEquals(9, address.getHouseNumber());
+        assertEquals("Belgrade", address.getCity());
+        assertEquals("Serbia", address.getCountry());
+        assertEquals(formatter.parse(formatter.format(calendar.getTime())), company.getFoundingDate());
     }
 
     @Test
     void extractIdColumnName() {
         EntityParser ep = new EntityParser();
-        assertEquals(ep.extractIdColumnName(User.class), "id");
-        assertEquals(ep.extractIdColumnName(Company.class), "id");
+        assertEquals("id", ep.extractIdColumnName(User.class));
+        assertEquals("id", ep.extractIdColumnName(Company.class));
     }
 
     @Test

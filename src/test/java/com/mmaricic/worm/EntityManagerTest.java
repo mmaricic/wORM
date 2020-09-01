@@ -199,7 +199,7 @@ class EntityManagerTest {
                 .offset(1)
                 .limit(2);
 
-        assertEquals(companies.size(), 2);
+        assertEquals(2, companies.size());
         compareCompanies(company, companies.get(0));
         compareCompanies(company2, companies.get(1));
     }
@@ -293,7 +293,7 @@ class EntityManagerTest {
         List<Map<String, Object>> companies = em.query(
                 "SELECT name, city FROM companies WHERE country='Serbia' ORDER BY city;");
 
-        assertEquals(companies.size(), 2);
+        assertEquals(2, companies.size());
         MapDifference<String, Object> diff = Maps.difference(expected1, companies.get(0));
         assertTrue(diff.areEqual(), diff.toString());
         diff = Maps.difference(expected2, companies.get(1));
