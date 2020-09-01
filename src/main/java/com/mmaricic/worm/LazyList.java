@@ -1,15 +1,15 @@
 package com.mmaricic.worm;
 
-import com.mmaricic.worm.exceptions.QueryException;
+import com.mmaricic.worm.exceptions.*;
 
 import java.util.*;
 
 public class LazyList<T> implements List<T> {
     private List<T> delegate;
-    private final StringJoiner sqlJoiner;
-    private boolean firstWhereAdded = false;
     private final Class<T> entityClass;
     private final EntityManager entityManager;
+    private final StringJoiner sqlJoiner;
+    private boolean whereAdded = false;
     private final List<String> orderBy = new ArrayList<>();
     private Integer limit = null;
     private Integer offset = null;
@@ -25,58 +25,46 @@ public class LazyList<T> implements List<T> {
     }
 
     public LazyList<T> where(String sql) {
-        if (firstWhereAdded) {
+        if (whereAdded)
             sqlJoiner.add("AND");
-        } else {
+        else {
             sqlJoiner.add("WHERE");
+            whereAdded = true;
         }
         sqlJoiner.add(sql);
-        firstWhereAdded = true;
         return this;
     }
 
-/*    public LazyList<T>  orWhere(String sql) {
-        if(!firstWhereAdded) {
-            throw new QueryException("Can't use OR where when there is no other condition.");
-        }
-        sqlJoiner.add("OR").add(sql);
-        return this;
-    }*/
-
     public LazyList<T> orderBy(String order) {
         String[] spl = order.split(" ");
-        if (spl.length > 2) {
+        if (spl.length > 2)
             throw new QueryException(
                     "Order by accepts only one column name and optionally 'asc' or 'desc' for order direction");
-        }
-        if (spl.length == 2) {
-            if (!spl[1].equalsIgnoreCase("asc") && !spl[1].equalsIgnoreCase("desc")) {
-                throw new QueryException(
-                        "Order by accepts only one column name and optionally 'asc' or 'desc' for order direction");
-            }
-        }
+        if (spl.length == 2
+                && !spl[1].equalsIgnoreCase("asc") && !spl[1].equalsIgnoreCase("desc"))
+            throw new QueryException(
+                    "Order by accepts only one column name and optionally 'asc' or 'desc' for order direction");
+
         orderBy.add(order);
         return this;
     }
 
     public LazyList<T> limit(int limit) {
-        if (this.limit != null) {
-            throw new QueryException("You already set limit for your query");
-        }
-        if (limit < 0) {
+        if (this.limit != null)
+            throw new QueryException("You've already set limit for your query");
+        if (limit < 0)
             throw new QueryException("Limit can't be negative or zero.");
-        }
+
         this.limit = limit;
         return this;
     }
 
     public LazyList<T> offset(int offset) {
-        if (this.offset != null) {
-            throw new QueryException("You already set offset for your query");
-        }
-        if (offset < 0) {
+        if (this.offset != null)
+            throw new QueryException("You've already set offset for your query");
+        if (offset < 0)
             throw new QueryException("Offset can't be negative.");
-        }
+
         this.offset = offset;
         return this;
     }
@@ -84,13 +72,14 @@ public class LazyList<T> implements List<T> {
     public T first() {
         limit = 1;
         init();
-        if (delegate.size() == 0) {
+        if (delegate.size() == 0)
             return null;
-        }
+
         return delegate.get(0);
     }
 
-    private void init() {
+    private void init()
+            throws AnnotationException, EntityLoaderException, EntityIdException, EntityException, QueryException {
         if (delegate != null)
             return;
 
@@ -107,12 +96,12 @@ public class LazyList<T> implements List<T> {
             }
             sqlJoiner.add(orderJoin.toString());
         }
-        if (limit != null) {
+
+        if (limit != null)
             sqlJoiner.add("LIMIT").add(limit.toString());
-        }
-        if (offset != null) {
+
+        if (offset != null)
             sqlJoiner.add("OFFSET").add(offset.toString());
-        }
 
         delegate = entityManager.query(sqlJoiner.toString() + ";", entityClass);
     }

@@ -37,20 +37,6 @@ class QueryBuilder {
         return query.toString();
     }
 
-
-    static String objToString(Object obj) {
-        if (obj == null)
-            return "NULL";
-        String res = obj.toString();
-        if (Number.class.isAssignableFrom(obj.getClass())) {
-            return res;
-        }
-        if (obj instanceof Date) {
-            res = new java.sql.Date(((Date) obj).getTime()).toString();
-        }
-        return "'" + res + "'";
-    }
-
     static String buildUpdateQuery(
             String tableName, Map<String, Object> entityElements, String idColumn, Object idValue) {
         StringBuilder query = new StringBuilder("UPDATE ");
@@ -87,5 +73,19 @@ class QueryBuilder {
         StringBuilder query = new StringBuilder("SELECT * FROM ");
         query.append(tableName);
         return query.toString();
+    }
+
+    static String objToString(Object obj) {
+        if (obj == null)
+            return "NULL";
+
+        String res = obj.toString();
+        if (Number.class.isAssignableFrom(obj.getClass()))
+            return res;
+
+        if (obj instanceof Date)
+            res = new java.sql.Date(((Date) obj).getTime()).toString();
+
+        return "'" + res + "'";
     }
 }

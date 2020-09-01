@@ -62,6 +62,9 @@ public class User {
         return 0;
     }
 
+    public void setAge(int age) {
+    }
+
     @Embeddable
     public static class Name {
         @Column(name = "first_name") // This will be ignored because access type is inherited from parent.
