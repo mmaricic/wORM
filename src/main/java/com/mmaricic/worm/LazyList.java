@@ -16,12 +16,13 @@ public class LazyList<T> implements List<T> {
     private boolean rawSql;
 
 
-    public LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql) {
+    public LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql, boolean whereAdded) {
         sqlJoiner = new StringJoiner(" ");
         sqlJoiner.add(sql);
         this.entityClass = entityClass;
         this.entityManager = entityManager;
         this.rawSql = rawSql;
+        this.whereAdded = whereAdded;
     }
 
     public LazyList<T> where(String sql) {

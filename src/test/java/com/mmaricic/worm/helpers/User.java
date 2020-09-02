@@ -1,6 +1,7 @@
 package com.mmaricic.worm.helpers;
 
 import javax.persistence.*;
+import java.util.List;
 
 @Entity
 public class User {
@@ -10,6 +11,7 @@ public class User {
     private String email;
     private String password;
     private Name name;
+    List<Car> cars;
 
     @Id
     @GeneratedValue
@@ -63,6 +65,23 @@ public class User {
     }
 
     public void setAge(int age) {
+    }
+
+    @OneToMany(mappedBy = "owner", orphanRemoval = true)
+    public List<Car> getCars() {
+        return cars;
+    }
+
+    public void setCars(List<Car> cars) {
+        this.cars = cars;
+    }
+
+    public void addCar(Car c) {
+        cars.add(c);
+    }
+
+    public void removeCar(Car c) {
+        cars.remove(c);
     }
 
     @Embeddable

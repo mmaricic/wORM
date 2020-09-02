@@ -95,7 +95,7 @@ public class EntityManager {
 
             ResultSet generatedKeys = stm.getGeneratedKeys();
             if (generatedKeys.next()) {
-                Field idField = entity.getClass().getDeclaredField(entityId.getKey());
+                Field idField = entityParser.getIdField(entity.getClass());
                 idField.setAccessible(true);
                 idField.set(entity, extractIdFromResultSet(generatedKeys, idField.getType()));
 
@@ -201,7 +201,14 @@ public class EntityManager {
         entityParser.verifyItsEntityClass(entityClass);
         String tableName = entityParser.extractTableName(entityClass);
         String sql = QueryBuilder.buildFindQuery(tableName);
-        return new LazyList<>(sql, entityClass, this, false);
+        boolean whereAdded = false;
+        if (entityClass.getSuperclass() != Object.class) {
+            sql = sql + " WHERE " +
+                    entityParser.getDiscriminatorColumnName(entityClass)
+                    + "=" + QueryBuilder.objToString(entityParser.getDiscriminatorValue(entityClass));
+            whereAdded = true;
+        }
+        return new LazyList<>(sql, entityClass, this, false, whereAdded);
     }
 
     public List<Map<String, Object>> query(String sql) throws QueryException {

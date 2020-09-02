@@ -264,8 +264,10 @@ class AssociationHandler {
         OneToOne oneToOne = ae.getAnnotation(OneToOne.class);
         if (oneToOne != null)
             return oneToOne.mappedBy();
-
-        return ae.getAnnotation(ManyToMany.class).mappedBy();
+        ManyToMany manyToMany = ae.getAnnotation(ManyToMany.class);
+        if (manyToMany != null)
+            return manyToMany.mappedBy();
+        return "";
     }
 
     private Set<CascadeType> getCascadeTypes(AnnotatedElement ae) {
@@ -302,6 +304,8 @@ class AssociationHandler {
                 for (Field assocField : associations) {
                     assocField.setAccessible(true);
                     Object fieldValue = assocField.get(entity);
+                    if (fieldValue == null)
+                        continue;
                     if (Collection.class.isAssignableFrom(fieldValue.getClass()))
                         for (Object child : (Collection) fieldValue)
                             deleteSingleAssociation(child, assocField, entity);
@@ -318,6 +322,8 @@ class AssociationHandler {
 
             for (Method getMethod : associations) {
                 Object fieldValue = getMethod.invoke(entity);
+                if (fieldValue == null)
+                    continue;
                 if (Collection.class.isAssignableFrom(getMethod.getReturnType()))
                     for (Object child : (Collection) fieldValue)
                         deleteSingleAssociation(child, getMethod, entity);
@@ -405,7 +411,7 @@ class AssociationHandler {
                 Object value = null;
 
                 if (getMethod.getAnnotation(OneToMany.class) != null) {
-                    ParameterizedType collectionType = (ParameterizedType) getMethod.getGenericParameterTypes()[0];
+                    ParameterizedType collectionType = (ParameterizedType) getMethod.getGenericReturnType();
                     Class<?> childrenType = (Class<?>) collectionType.getActualTypeArguments()[0];
                     value = fetchOneToMany(entity, getMethod, childrenType);
                 }
@@ -447,7 +453,7 @@ class AssociationHandler {
                 childTable, manyToManyTableId.tableName, childIdInTable, manyToManyTableId.childCol,
                 manyToManyTableId.entityCol, QueryBuilder.objToString(entityId));
         if (manyToManyAnnot.getAnnotation(ManyToMany.class).fetch() == FetchType.LAZY) {
-            return new LazyList<>(selectAllQuery + ";", manyToManyType, em, true);
+            return new LazyList<>(selectAllQuery + ";", manyToManyType, em, true, false);
         }
         String selectIds = String.format("SELECT %s FROM %s WHERE %s=%s;",
                 manyToManyTableId.childCol,
@@ -515,7 +521,7 @@ class AssociationHandler {
         if (childAnnot.getAnnotation(OneToMany.class).fetch() == FetchType.EAGER) {
             return em.query(query, childrenType);
         }
-        return new LazyList<>(query, childrenType, em, true);
+        return new LazyList<>(query, childrenType, em, true, false);
     }
 
     private Object fetchOneToOne(Object entity, AnnotatedElement childAnnot, Class<?> childrenType)
@@ -588,7 +594,7 @@ class AssociationHandler {
                     .collect(Collectors.toList());
             for (Method method : associations) {
                 if (method.getAnnotation(OneToMany.class) != null) {
-                    ParameterizedType collectionType = (ParameterizedType) method.getGenericParameterTypes()[0];
+                    ParameterizedType collectionType = (ParameterizedType) method.getGenericReturnType();
                     Class<?> childType = (Class<?>) collectionType.getActualTypeArguments()[0];
                     Object children = method.invoke(entity);
                     removeLinksForChildren(entity, method, childType, children);

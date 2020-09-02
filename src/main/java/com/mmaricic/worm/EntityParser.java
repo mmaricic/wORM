@@ -22,20 +22,51 @@ public class EntityParser {
             return new LinkedHashMap<>();
         }
         Class<?> entityClass = entity.getClass();
-
+        Map<String, Object> result = new HashMap<>();
         if (isIddAnnotationOnField(entityClass))
-            return parseFromFields(entity, includeId);
+            do {
+                result.putAll(parseFromFields(entity, entityClass, includeId));
+                entityClass = entityClass.getSuperclass();
+            } while (entityClass != null && entityClass != Object.class);
         else
-            return parseFromGetters(entity, includeId);
+            do {
+                result.putAll(parseFromGetters(entity, entityClass, includeId));
+                entityClass = entityClass.getSuperclass();
+            } while (entityClass != null && entityClass != Object.class);
+
+        entityClass = entity.getClass();
+        if (entityClass.getSuperclass() != Object.class || entityClass.getAnnotation(Inheritance.class) != null) {
+            String dc = getDiscriminatorColumnName(entityClass);
+            String dv = getDiscriminatorValue(entityClass);
+            result.put(dc, dv);
+        }
+
+        return result;
     }
 
-    private Map<String, Object> parseFromFields(Object entity, boolean includeId)
+    String getDiscriminatorValue(Class<?> entityClass) {
+        DiscriminatorValue dv = entityClass.getAnnotation(DiscriminatorValue.class);
+        if (dv == null)
+            return entityClass.getSimpleName();
+        return dv.value();
+    }
+
+    String getDiscriminatorColumnName(Class<?> entityClass) {
+        while (entityClass != null && entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
+        DiscriminatorColumn dc = entityClass.getAnnotation(DiscriminatorColumn.class);
+        if (dc == null)
+            return "dtype";
+
+        return dc.name();
+    }
+
+    private Map<String, Object> parseFromFields(Object entity, Class<?> entityClass, boolean includeId)
             throws EntityLoaderException, AnnotationException {
         Map<String, Object> result = new LinkedHashMap<>();
         if (entity == null)
             return result;
-
-        Class<?> entityClass = entity.getClass();
 
         for (Field field : entityClass.getDeclaredFields()) {
             if (shouldNotPersist(field, includeId, entityClass.getSimpleName()))
@@ -49,7 +80,7 @@ public class EntityParser {
 
             try {
                 if (field.getAnnotation(Embedded.class) != null) {
-                    result.putAll(parseFromFields(field.get(entity), includeId));
+                    result.putAll(parseFromFields(field.get(entity), field.getType(), includeId));
                     continue;
                 }
 
@@ -65,14 +96,12 @@ public class EntityParser {
         return result;
     }
 
-    private Map<String, Object> parseFromGetters(Object entity, boolean includeId)
+    private Map<String, Object> parseFromGetters(Object entity, Class<?> entityClass, boolean includeId)
             throws EntityIdException, EntityLoaderException, AnnotationException {
         Map<String, Object> result = new LinkedHashMap<>();
         if (entity == null) {
             return result;
         }
-
-        Class<?> entityClass = entity.getClass();
         boolean foundId = false;
 
         try {
@@ -93,7 +122,7 @@ public class EntityParser {
 
                 try {
                     if (getMethod.getAnnotation(Embedded.class) != null) {
-                        result.putAll(parseFromGetters(getMethod.invoke(entity), includeId));
+                        result.putAll(parseFromGetters(getMethod.invoke(entity), getMethod.getReturnType(), includeId));
                         continue;
                     }
 
@@ -147,6 +176,9 @@ public class EntityParser {
     }
 
     String extractTableName(Class<?> entityClass) throws AnnotationException {
+        while (entityClass != null && entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
         verifyItsEntityClass(entityClass);
         Table annot = entityClass.getAnnotation(Table.class);
         if (annot != null) {
@@ -158,6 +190,9 @@ public class EntityParser {
     AbstractMap.SimpleEntry<String, Object> extractId(Object entity)
             throws EntityIdException, EntityException {
         Class<?> entityClass = entity.getClass();
+        while (entityClass != null && entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
 
         List<Field> idList = Stream.of(entityClass.getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(Id.class)).collect(Collectors.toList());
@@ -178,9 +213,11 @@ public class EntityParser {
         }
 
         PropertyDescriptor idDescriptor = getIdDescriptor(entityClass);
+        Method getMethod = idDescriptor.getReadMethod();
         try {
             return new AbstractMap.SimpleEntry<>(
-                    getColumnNameFromDescriptor(idDescriptor), idDescriptor.getReadMethod().invoke(entity));
+                    getColumnNameFromDescriptor(idDescriptor),
+                    getMethod.invoke(entity));
 
         } catch (IllegalAccessException | InvocationTargetException e) {
             throw new EntityException(String.format(
@@ -190,6 +227,9 @@ public class EntityParser {
     }
 
     String extractIdColumnName(Class<?> entityClass) throws EntityIdException, EntityException {
+        while (entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
         List<Field> idList = Stream.of(entityClass.getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(Id.class)).collect(Collectors.toList());
 
@@ -234,7 +274,15 @@ public class EntityParser {
                     "Default constructor for entity class %s threw the following error: %S",
                     entityClass.getSimpleName(), e.getMessage()));
         }
+        Class<?> currentClass = entityClass;
+        do {
+            convertRowToEntity(entity, currentClass, entityElements, parentClass);
+            currentClass = currentClass.getSuperclass();
+        } while (currentClass != null && currentClass != Object.class);
+        return entity;
+    }
 
+    private void convertRowToEntity(Object entity, Class<?> entityClass, Map<String, Object> entityElements, Class<?> parentClass) {
         try {
             if (isIddAnnotationOnField(parentClass == null ? entityClass : parentClass)) {
                 for (Field field : entityClass.getDeclaredFields()) {
@@ -290,10 +338,12 @@ public class EntityParser {
         } catch (IllegalAccessException | InvocationTargetException | IntrospectionException e) {
             throw new EntityLoaderException("An error occurred while trying to convert row: " + e.getMessage());
         }
-        return entity;
     }
 
     boolean isIddAnnotationOnField(Class<?> entityClass) throws EntityIdException {
+        while (entityClass != null && entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
         long fieldsWithId = Stream.of(entityClass.getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(Id.class)).count();
         if (fieldsWithId > 1) {
@@ -334,6 +384,9 @@ public class EntityParser {
     }
 
     boolean idIsAutoGenerated(Class<?> entityClass) throws EntityException {
+        while (entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
         Optional<Field> idField = Stream.of(entityClass.getDeclaredFields())
                 .filter(field -> field.isAnnotationPresent(Id.class)).findAny();
         if (idField.isPresent())
@@ -354,5 +407,12 @@ public class EntityParser {
                     entityClass.getSimpleName(), e.getMessage()));
         }
         return false;
+    }
+
+    Field getIdField(Class<?> entityClass) throws NoSuchFieldException {
+        while (entityClass.getSuperclass() != Object.class) {
+            entityClass = entityClass.getSuperclass();
+        }
+        return entityClass.getDeclaredField(extractIdColumnName(entityClass));
     }
 }
