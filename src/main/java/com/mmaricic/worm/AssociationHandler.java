@@ -515,7 +515,7 @@ class AssociationHandler {
                 childTableName, parentForeignKeyIdCol, parentId.getValue());
     }
 
-    private <T> List<?> fetchOneToMany(Object entity, AnnotatedElement childAnnot, Class<?> childrenType)
+    private List<?> fetchOneToMany(Object entity, AnnotatedElement childAnnot, Class<?> childrenType)
             throws AnnotationException, EntityLoaderException, EntityIdException, EntityException, QueryException {
         String query = composeFetchChildrenQuery(entity, childAnnot, childrenType);
         if (childAnnot.getAnnotation(OneToMany.class).fetch() == FetchType.EAGER) {
@@ -576,7 +576,7 @@ class AssociationHandler {
                             !field.getAnnotation(OneToOne.class).mappedBy().isEmpty()) {
                         Object child = field.get(entity);
                         removeLinksForChildren(entity, field, field.getType(),
-                                child == null ? child : Collections.singletonList(child));
+                                child == null ? null : Collections.singletonList(child));
                     }
                     if (field.getAnnotation(ManyToMany.class) != null) {
                         ParameterizedType collectionType = (ParameterizedType) field.getGenericType();
@@ -603,7 +603,7 @@ class AssociationHandler {
                         !method.getAnnotation(OneToOne.class).mappedBy().isEmpty()) {
                     Object child = method.invoke(entity);
                     removeLinksForChildren(entity, method, method.getReturnType(),
-                            child == null ? child : Collections.singletonList(child));
+                            child == null ? null : Collections.singletonList(child));
                 }
                 if (method.getAnnotation(ManyToMany.class) != null) {
                     ParameterizedType collectionType = (ParameterizedType) method.getGenericReturnType();
@@ -662,7 +662,7 @@ class AssociationHandler {
         em.executeUpdate(sql);
     }
 
-    private class ManyToManyTableId {
+    private static class ManyToManyTableId {
         String tableName;
         String entityCol;
         String childCol;

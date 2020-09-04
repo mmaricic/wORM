@@ -9,11 +9,11 @@ public class LazyList<T> implements List<T> {
     private final Class<T> entityClass;
     private final EntityManager entityManager;
     private final StringJoiner sqlJoiner;
-    private boolean whereAdded = false;
+    private boolean whereAdded;
     private final List<String> orderBy = new ArrayList<>();
     private Integer limit = null;
     private Integer offset = null;
-    private boolean rawSql;
+    private final boolean rawSql;
 
 
     public LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql, boolean whereAdded) {

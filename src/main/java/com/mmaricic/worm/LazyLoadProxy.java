@@ -10,9 +10,9 @@ public class LazyLoadProxy<T> implements MethodInterceptor {
 
     private T entity;
     private boolean invoked = false;
-    private Class<T> entityClass;
-    private EntityManager entityManager;
-    private String query;
+    private final Class<T> entityClass;
+    private final EntityManager entityManager;
+    private final String query;
 
     public LazyLoadProxy(Class<T> entityClass, EntityManager entityManager, String query) {
         this.entityClass = entityClass;
