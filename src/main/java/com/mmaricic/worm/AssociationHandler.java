@@ -22,7 +22,7 @@ class AssociationHandler {
     }
 
     Map<String, Object> getAssociatedParentsIds(Object entity) throws EntityException, EntityIdException {
-        Map<String, Object> ids = new HashMap<>();
+        Map<String, Object> ids = new LinkedHashMap<>();
         try {
             if (ep.isIddAnnotationOnField(entity.getClass())) {
                 List<Field> associations = Stream.of(entity.getClass().getDeclaredFields())
@@ -184,9 +184,10 @@ class AssociationHandler {
                         association.childCol, childColValue));
 
                 if (res.isEmpty()) {
-                    LinkedHashMap<String, Object> vals = new LinkedHashMap<>();
-                    vals.put(association.entityCol, entityColValue);
-                    vals.put(association.childCol, childColValue);
+
+                    LinkedHashSet<String> vals = new LinkedHashSet<>();
+                    vals.add(association.entityCol);
+                    vals.add(association.childCol);
                     String query = QueryBuilder.buildInsertQuery(association.tableName, vals);
                     em.executeUpdate(query, entityColValue, childColValue);
                 }

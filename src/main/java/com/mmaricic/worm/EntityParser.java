@@ -22,7 +22,7 @@ class EntityParser {
             return new LinkedHashMap<>();
         }
         Class<?> entityClass = entity.getClass();
-        Map<String, Object> result = new HashMap<>();
+        Map<String, Object> result = new LinkedHashMap<>();
         if (isIddAnnotationOnField(entityClass))
             do {
                 result.putAll(parseFromFields(entity, entityClass, includeId));

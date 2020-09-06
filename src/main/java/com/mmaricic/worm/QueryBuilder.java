@@ -2,27 +2,27 @@ package com.mmaricic.worm;
 
 import java.util.Date;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.Set;
 
 class QueryBuilder {
-    static String buildInsertQuery(String tableName, Map<String, Object> entityElements) {
-        StringBuilder columns = new StringBuilder();
+    static String buildInsertQuery(String tableName, Set<String> columns) {
+        StringBuilder cols = new StringBuilder();
         StringBuilder values = new StringBuilder();
 
-        Iterator<Map.Entry<String, Object>> it = entityElements.entrySet().iterator();
+        Iterator<String> it = columns.iterator();
         while (it.hasNext()) {
-            Map.Entry<String, Object> pair = it.next();
-            columns.append(pair.getKey());
+            String col = it.next();
+            cols.append(col);
             values.append("?");
             if (it.hasNext()) {
-                columns.append(", ");
+                cols.append(", ");
                 values.append(", ");
             }
         }
 
         StringBuilder query = new StringBuilder("INSERT INTO ");
         query.append(tableName);
-        query.append(" (").append(columns.toString()).append(") ");
+        query.append(" (").append(cols.toString()).append(") ");
         query.append("VALUES (").append(values.toString()).append(");");
 
         return query.toString();
@@ -38,15 +38,15 @@ class QueryBuilder {
     }
 
     static String buildUpdateQuery(
-            String tableName, Map<String, Object> entityElements, String idColumn) {
+            String tableName, Set<String> columnsToUpdate, String idColumn) {
         StringBuilder query = new StringBuilder("UPDATE ");
         query.append(tableName);
         query.append(" SET ");
 
-        Iterator<Map.Entry<String, Object>> it = entityElements.entrySet().iterator();
+        Iterator<String> it = columnsToUpdate.iterator();
         while (it.hasNext()) {
-            Map.Entry<String, Object> pair = it.next();
-            query.append(pair.getKey());
+            String col = it.next();
+            query.append(col);
             query.append("=");
             query.append("?");
             if (it.hasNext()) {
