@@ -208,6 +208,12 @@ class EntityManagerTest {
         assertEquals(2, companies.size());
         compareCompanies(company, companies.get(0));
         compareCompanies(company2, companies.get(1));
+
+        int count = em.find(Company.class)
+                .where("country='Serbia'")
+                .where("founding_date<'2020-01-01'")
+                .count();
+        assertEquals(4, count);
     }
 
     @Test
@@ -304,6 +310,67 @@ class EntityManagerTest {
         assertTrue(diff.areEqual(), diff.toString());
         diff = Maps.difference(expected2, companies.get(1));
         assertTrue(diff.areEqual(), diff.toString());
+
+        companies = em.preparedQuery(
+                "SELECT name, city FROM companies WHERE country=? ORDER BY ?;", "Serbia", "city");
+
+        assertEquals(2, companies.size());
+        diff = Maps.difference(expected1, companies.get(0));
+        assertTrue(diff.areEqual(), diff.toString());
+        diff = Maps.difference(expected2, companies.get(1));
+        assertTrue(diff.areEqual(), diff.toString());
+
+    }
+
+    @Test
+    void queryWithClass() throws Exception {
+        Calendar calendar = Calendar.getInstance();
+
+        EntityManager em = EntityManagerFactory.getEntityManager();
+        Company company = new Company();
+        company.setId(2);
+        company.setName("Company");
+        calendar.set(2016, Calendar.JULY, 10);
+        company.setFoundingDate(formatter.parse(formatter.format(calendar.getTime())));
+        Company.Address address = new Company.Address();
+        address.setCountry("Serbia");
+        address.setCity("Belgrade");
+        address.setHouseNumber(0);
+        company.setAddress(address);
+
+
+        Company company2 = new Company();
+        company2.setId(3);
+        company2.setName("Company 2");
+        calendar.set(2014, Calendar.APRIL, 17);
+        company2.setFoundingDate(formatter.parse(formatter.format(calendar.getTime())));
+        address = new Company.Address();
+        address.setCountry("Serbia");
+        address.setCity("Nis");
+        company2.setAddress(address);
+
+        em.save(company);
+        em.save(company2);
+
+        List<Company> companies = em.query(
+                "SELECT name, city FROM companies WHERE country='Serbia' ORDER BY city asc;", Company.class);
+
+        assertEquals(2, companies.size());
+        assertEquals(company.getName(), companies.get(0).getName());
+        assertEquals(company.getAddress().getCity(), companies.get(0).getAddress().getCity());
+        assertEquals(company2.getName(), companies.get(1).getName());
+        assertEquals(company2.getAddress().getCity(), companies.get(1).getAddress().getCity());
+
+
+        companies = em.preparedQuery(Company.class,
+                "SELECT name, city FROM companies WHERE country=? ORDER BY city desc;", "Serbia");
+
+        assertEquals(2, companies.size());
+        assertEquals(company2.getName(), companies.get(0).getName());
+        assertEquals(company2.getAddress().getCity(), companies.get(0).getAddress().getCity());
+        assertEquals(company.getName(), companies.get(1).getName());
+        assertEquals(company.getAddress().getCity(), companies.get(1).getAddress().getCity());
+
 
     }
 

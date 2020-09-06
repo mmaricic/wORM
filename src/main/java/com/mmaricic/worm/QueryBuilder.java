@@ -13,7 +13,7 @@ class QueryBuilder {
         while (it.hasNext()) {
             Map.Entry<String, Object> pair = it.next();
             columns.append(pair.getKey());
-            values.append(objToString(pair.getValue()));
+            values.append("?");
             if (it.hasNext()) {
                 columns.append(", ");
                 values.append(", ");
@@ -28,17 +28,17 @@ class QueryBuilder {
         return query.toString();
     }
 
-    static String buildDeleteQuery(String tableName, String idColumn, Object idValue) {
+    static String buildDeleteQuery(String tableName, String idColumn) {
         StringBuilder query = new StringBuilder("DELETE FROM ");
         query.append(tableName);
         query.append(" WHERE ");
-        query.append(idColumn).append("=").append(objToString(idValue)).append(";");
+        query.append(idColumn).append("=").append("?").append(";");
 
         return query.toString();
     }
 
     static String buildUpdateQuery(
-            String tableName, Map<String, Object> entityElements, String idColumn, Object idValue) {
+            String tableName, Map<String, Object> entityElements, String idColumn) {
         StringBuilder query = new StringBuilder("UPDATE ");
         query.append(tableName);
         query.append(" SET ");
@@ -48,14 +48,14 @@ class QueryBuilder {
             Map.Entry<String, Object> pair = it.next();
             query.append(pair.getKey());
             query.append("=");
-            query.append(objToString(pair.getValue()));
+            query.append("?");
             if (it.hasNext()) {
                 query.append(", ");
             }
         }
 
         query.append(" WHERE ");
-        query.append(idColumn).append("=").append(objToString(idValue)).append(";");
+        query.append(idColumn).append("=").append("?").append(";");
 
         return query.toString();
     }
@@ -69,12 +69,6 @@ class QueryBuilder {
         return query.toString();
     }
 
-    static String buildFindQuery(String tableName) {
-        StringBuilder query = new StringBuilder("SELECT * FROM ");
-        query.append(tableName);
-        return query.toString();
-    }
-
     static String objToString(Object obj) {
         if (obj == null)
             return "NULL";
@@ -82,6 +76,9 @@ class QueryBuilder {
         String res = obj.toString();
         if (Number.class.isAssignableFrom(obj.getClass()))
             return res;
+
+        if (obj instanceof Boolean)
+            return (boolean) obj ? "1" : "0";
 
         if (obj instanceof Date)
             res = new java.sql.Date(((Date) obj).getTime()).toString();

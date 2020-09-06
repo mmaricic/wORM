@@ -14,7 +14,7 @@ public class User {
     @JoinColumn(name = "company_id")
     private Company workplace;
     @ManyToMany(cascade = CascadeType.PERSIST, fetch = FetchType.EAGER)
-    @JoinTable(name = "user_address", joinColumns = @JoinColumn(name = "user_id"))
+    @JoinTable(name = "users_addresses", joinColumns = @JoinColumn(name = "user_id"))
     private List<Address> addresses = new ArrayList<>();
     @OneToMany(cascade = CascadeType.PERSIST, mappedBy = "owner", orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Phone> phones = new ArrayList<>();

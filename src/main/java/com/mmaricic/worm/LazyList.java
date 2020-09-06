@@ -14,9 +14,10 @@ public class LazyList<T> implements List<T> {
     private Integer limit = null;
     private Integer offset = null;
     private final boolean rawSql;
+    private boolean count;
 
 
-    public LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql, boolean whereAdded) {
+    LazyList(String sql, Class<T> entityClass, EntityManager entityManager, boolean rawSql, boolean whereAdded) {
         sqlJoiner = new StringJoiner(" ");
         sqlJoiner.add(sql);
         this.entityClass = entityClass;
@@ -79,6 +80,11 @@ public class LazyList<T> implements List<T> {
         return delegate.get(0);
     }
 
+    public int count() {
+        init();
+        return delegate.size();
+    }
+
     private void init()
             throws AnnotationException, EntityLoaderException, EntityIdException, EntityException, QueryException {
         if (delegate != null)
@@ -88,6 +94,9 @@ public class LazyList<T> implements List<T> {
             delegate = entityManager.query(sqlJoiner.toString(), entityClass);
             return;
         }
+
+        if (limit == null && offset != null)
+            throw new QueryException("You cannot set offset without limit");
 
         if (orderBy.size() > 0) {
             sqlJoiner.add("ORDER BY");
@@ -261,5 +270,11 @@ public class LazyList<T> implements List<T> {
     public int hashCode() {
         init();
         return delegate.hashCode();
+    }
+
+    @Override
+    public String toString() {
+        init();
+        return delegate.toString();
     }
 }

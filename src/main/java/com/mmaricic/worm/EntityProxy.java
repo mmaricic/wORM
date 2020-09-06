@@ -6,7 +6,7 @@ import net.sf.cglib.proxy.MethodProxy;
 import java.lang.reflect.Method;
 import java.util.List;
 
-public class LazyLoadProxy<T> implements MethodInterceptor {
+public class EntityProxy<T> implements MethodInterceptor {
 
     private T entity;
     private boolean invoked = false;
@@ -14,7 +14,7 @@ public class LazyLoadProxy<T> implements MethodInterceptor {
     private final EntityManager entityManager;
     private final String query;
 
-    public LazyLoadProxy(Class<T> entityClass, EntityManager entityManager, String query) {
+    public EntityProxy(Class<T> entityClass, EntityManager entityManager, String query) {
         this.entityClass = entityClass;
         this.entityManager = entityManager;
         this.query = query;

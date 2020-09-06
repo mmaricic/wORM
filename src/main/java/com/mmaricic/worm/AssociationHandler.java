@@ -172,7 +172,7 @@ class AssociationHandler {
         if (fieldAnnot.getAnnotation(ManyToMany.class) != null) {
             for (Object child : (Collection) fieldValue) {
                 if (ep.extractId(child).getValue() == null) {
-                    em.save(child, null);
+                    em.save(child);
                 }
 
                 ManyToManyTableId association = getManyToManyTableAndCols(entity.getClass(), child.getClass(), fieldAnnot);
@@ -184,9 +184,11 @@ class AssociationHandler {
                         association.childCol, childColValue));
 
                 if (res.isEmpty()) {
-                    em.executeUpdate(QueryBuilder.buildInsertQuery(association.tableName,
-                            Map.of(association.entityCol, entityColValue,
-                                    association.childCol, childColValue)));
+                    LinkedHashMap<String, Object> vals = new LinkedHashMap<>();
+                    vals.put(association.entityCol, entityColValue);
+                    vals.put(association.childCol, childColValue);
+                    String query = QueryBuilder.buildInsertQuery(association.tableName, vals);
+                    em.executeUpdate(query, entityColValue, childColValue);
                 }
             }
             return true;
@@ -346,7 +348,7 @@ class AssociationHandler {
             Object entityColValue = ep.extractId(entity).getValue();
             ManyToManyTableId association = getManyToManyTableAndCols(entity.getClass(), fieldValue.getClass(), fieldAnnot);
             em.executeUpdate(QueryBuilder.buildDeleteQuery(
-                    association.tableName, association.entityCol, entityColValue));
+                    association.tableName, association.entityCol), entityColValue);
         }
     }
 
@@ -362,7 +364,7 @@ class AssociationHandler {
     }
 
 
-    <T> void fetchAssociations(T entity, Map<String, Object> entityMap) throws EntityIdException {
+    void fetchAssociations(Object entity, Map<String, Object> entityMap) throws EntityIdException {
         if (ep.isIddAnnotationOnField(entity.getClass())) {
             List<Field> associations = Stream.of(entity.getClass().getDeclaredFields())
                     .filter(this::isAssociation)
@@ -495,7 +497,7 @@ class AssociationHandler {
         } else {
             String idColumn = ep.extractIdColumnName(oneType);
             String query = QueryBuilder.buildFindByIdQuery(oneTableName, idColumn, idValue);
-            LazyLoadProxy llp = new LazyLoadProxy<>(oneType, em, query);
+            EntityProxy llp = new EntityProxy<>(oneType, em, query);
             Enhancer enhancer = new Enhancer();
             enhancer.setSuperclass(oneType);
             enhancer.setCallback(llp);
@@ -534,7 +536,7 @@ class AssociationHandler {
             return res.get(0);
         }
 
-        LazyLoadProxy llp = new LazyLoadProxy<>(childrenType, em, query);
+        EntityProxy llp = new EntityProxy<>(childrenType, em, query);
         Enhancer enhancer = new Enhancer();
         enhancer.setSuperclass(childrenType);
         enhancer.setCallback(llp);

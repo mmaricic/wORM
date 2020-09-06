@@ -40,7 +40,7 @@ public class AssociationHandlerTest {
         bds.setPassword(PASSWORD);
         try (Connection conn = bds.getConnection();
              Statement stm = conn.createStatement()) {
-            stm.executeUpdate("DELETE FROM user_address");
+            stm.executeUpdate("DELETE FROM users_addresses");
             stm.executeUpdate("DELETE FROM phone");
             stm.executeUpdate("DELETE FROM company");
             stm.executeUpdate("DELETE FROM user");
@@ -262,15 +262,17 @@ public class AssociationHandlerTest {
 
         assertNull(em.find(User.class, newUser.getId()));
         assertNotNull(em.find(Address.class, newAddress.getId()));
-        List<Map<String, Object>> res = em.query("SELECT * FROM user_address WHERE user_id=" + newUser.getId());
+        List<Map<String, Object>> res = em.query("SELECT * FROM users_addresses WHERE user_id=" + newUser.getId());
         assertEquals(0, res.size());
+        res = em.query("SELECT * FROM users_addresses WHERE address_id=" + newAddress.getId());
+        assertEquals(1, res.size());
 
         em.delete(newAddress);
 
         assertNull(em.find(Address.class, newAddress.getId()));
         assertNotNull(em.find(User.class, user.getId()));
 
-        res = em.query("SELECT * FROM user_address WHERE address_id=" + newAddress.getId());
+        res = em.query("SELECT * FROM users_addresses WHERE address_id=" + newAddress.getId());
         assertEquals(0, res.size());
     }
 }
